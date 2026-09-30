@@ -1,0 +1,6 @@
+{
+  "name": "swarnmusic",
+  "description": "Artisanal portfolio and discovery platform for singers, composers, and lyricists to showcase original works and collaborate via private chat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
