@@ -143,3 +143,68 @@ export const deleteFromDrive = async (fileId: string): Promise<boolean> => {
 
   return true;
 };
+
+export const exportUserDetailsToDrive = async (
+  currentUser: any,
+  registeredArtists: any[] = []
+): Promise<DriveFileItem> => {
+  const token = await getAccessToken();
+  if (!token) {
+    throw new Error('Google Drive access token not available. Please sign in with Google first.');
+  }
+
+  const payload = {
+    exportDate: new Date().toISOString(),
+    platform: 'swarnmusic (Artisanal Indian Classical & Acoustic Platform)',
+    profile: {
+      id: currentUser.id,
+      name: currentUser.name,
+      stageName: currentUser.stageName || '',
+      role: currentUser.role,
+      genre: currentUser.genre,
+      email: currentUser.email,
+      phone: currentUser.phone,
+      bio: currentUser.bio,
+      location: currentUser.location || '',
+      joinedDate: currentUser.joinedDate || '',
+      musicalInfluences: currentUser.musicalInfluences || [],
+      instrumentsPlayed: currentUser.instrumentsPlayed || [],
+      socialLinks: currentUser.socialLinks || {},
+    },
+    uploadedWorks: (currentUser.works || []).map((work: any) => ({
+      id: work.id,
+      title: work.title,
+      genre: work.genre,
+      roleAttributed: work.roleAttributed,
+      type: work.type,
+      description: work.description,
+      ragaOrMeter: work.ragaOrMeter,
+      lyricsContent: work.lyricsContent,
+      duration: work.duration,
+      averageRating: work.averageRating,
+      ratingsCount: work.ratingsCount,
+      reviews: work.reviews || [],
+      createdAt: work.createdAt,
+    })),
+    communityRosterSnapshot: registeredArtists.map((a: any) => ({
+      id: a.id,
+      name: a.name,
+      stageName: a.stageName,
+      role: a.role,
+      genre: a.genre,
+      worksCount: a.works?.length || 0,
+    })),
+  };
+
+  const safeName = (currentUser.name || 'User').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fileName = `swarnmusic_profile_${safeName}_${new Date().toISOString().split('T')[0]}.json`;
+  const jsonContent = JSON.stringify(payload, null, 2);
+
+  return await uploadToDrive(
+    fileName,
+    'application/json',
+    jsonContent,
+    `Full creator profile and works backup for ${currentUser.name} from swarnmusic`
+  );
+};
+

@@ -1,0 +1,18 @@
+{
+  "name": "swarnmusic — Artisanal Music Portfolio & Collaboration",
+  "short_name": "swarnmusic",
+  "description": "Artisanal portfolio and discovery platform for singers, composers, and lyricists to showcase original works and collaborate via private chat.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "window-controls-overlay"],
+  "orientation": "any",
+  "background_color": "#120B08",
+  "theme_color": "#120B08",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

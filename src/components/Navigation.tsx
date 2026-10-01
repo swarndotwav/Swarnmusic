@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SwarnLogo } from './SwarnLogo';
-import { MessageSquare, PlusCircle, User, Menu, X, LogOut, HardDrive } from 'lucide-react';
+import { MessageSquare, PlusCircle, User, Menu, X, LogOut, Send, Moon, Sun, Maximize2, Minimize2, Laptop } from 'lucide-react';
 import { ArtistProfile } from '../types';
 
 interface NavigationProps {
@@ -14,7 +14,12 @@ interface NavigationProps {
   onLogout: () => void;
   activeNavTab: string;
   setActiveNavTab: (tab: string) => void;
-  onOpenGoogleDrive?: () => void;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
+  themeMode?: 'system' | 'dark' | 'light';
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
+  incomingPop?: { senderName: string; text: string } | null;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -28,7 +33,12 @@ export const Navigation: React.FC<NavigationProps> = ({
   onLogout,
   activeNavTab,
   setActiveNavTab,
-  onOpenGoogleDrive,
+  isDarkMode = false,
+  onToggleDarkMode,
+  themeMode = 'system',
+  isFullscreen = false,
+  onToggleFullscreen,
+  incomingPop,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -41,7 +51,13 @@ export const Navigation: React.FC<NavigationProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[#FAF7F2]/95 backdrop-blur-md border-b border-[#E5D9C8] transition-all">
+    <header
+      className={`sticky top-0 z-40 w-full backdrop-blur-xl border-b transition-colors duration-300 ${
+        isDarkMode
+          ? 'bg-[#2D1A12]/92 border-white/10 text-[#FAF5EE]'
+          : 'bg-white/85 border-stone-200/80 text-stone-900'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
         {/* ZONE 1: Brand Wordmark (Faithfully using the logo mark) */}
         <div className="flex items-center gap-3">
@@ -104,18 +120,134 @@ export const Navigation: React.FC<NavigationProps> = ({
           </button>
           <button
             onClick={() => {
-              if (onOpenGoogleDrive) onOpenGoogleDrive();
+              const el = document.getElementById('community-experiences');
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+              }
             }}
-            className="flex items-center gap-1.5 transition-colors hover:text-[#7A131B] cursor-pointer text-stone-700"
-            title="Open Google Drive Studio Hub"
+            className="transition-colors hover:text-[#7A131B] cursor-pointer"
           >
-            <HardDrive size={14} className="text-[#7A131B]" />
-            <span>Google Drive</span>
+            Experiences
           </button>
+          <a
+            href="https://www.instagram.com/swarn.wav?stkn=MWpmMjR2OTVzOWdkMw=="
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-colors hover:text-[#7A131B]"
+          >
+            Join Community
+          </a>
         </nav>
 
-        {/* ZONE 3: 1-2 Primary Action Buttons */}
-        <div className="flex items-center gap-3">
+        {/* ZONE 3: Separate Messaging Icon & Action Buttons */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* THEME BUTTON - SYSTEM DEFAULT BY DEFAULT */}
+          <button
+            onClick={onToggleDarkMode}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer shadow-xs active:scale-95 group ${
+              isDarkMode
+                ? 'bg-[#3D251A] hover:bg-[#4D2F21] text-amber-200 border-amber-500/40'
+                : 'bg-white hover:bg-stone-50 text-stone-800 border-stone-300 hover:border-amber-800'
+            }`}
+            title={`Theme: ${themeMode === 'system' ? 'System Default' : isDarkMode ? 'Dark' : 'Light'} (Click to cycle)`}
+            aria-label="Toggle theme mode"
+          >
+            {themeMode === 'system' ? (
+              <Laptop size={13} className={isDarkMode ? 'text-amber-400' : 'text-stone-700'} />
+            ) : isDarkMode ? (
+              <Sun size={13} className="text-amber-400 group-hover:rotate-45 transition-transform" />
+            ) : (
+              <Moon size={13} className="text-stone-700 group-hover:text-amber-800 transition-colors" />
+            )}
+            <span className="text-xs font-bold tracking-tight hidden sm:inline">
+              {themeMode === 'system' ? `Auto (${isDarkMode ? 'Dark' : 'Light'})` : isDarkMode ? 'Dark' : 'Light'}
+            </span>
+            {themeMode === 'system' ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Following system theme" />
+            ) : isDarkMode ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            ) : null}
+          </button>
+
+          {/* FULL SCREEN TOGGLE BUTTON - FITS ANY SCREEN */}
+          {onToggleFullscreen && (
+            <button
+              onClick={onToggleFullscreen}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer shadow-xs active:scale-95 group ${
+                isFullscreen
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : isDarkMode
+                  ? 'bg-[#3D251A] hover:bg-[#4D2F21] text-stone-200 border-white/20'
+                  : 'bg-white hover:bg-stone-50 text-stone-800 border-stone-300 hover:border-stone-400'
+              }`}
+              title={isFullscreen ? 'Exit Full Screen' : 'Full Screen'}
+              aria-label="Full screen mode"
+            >
+              {isFullscreen ? (
+                <Minimize2 size={13} className="text-amber-400" />
+              ) : (
+                <Maximize2 size={13} className="text-stone-700 dark:text-stone-200 group-hover:scale-110 transition-transform" />
+              )}
+              <span className="text-xs font-bold tracking-tight hidden md:inline">
+                {isFullscreen ? 'Exit Fullscreen' : 'Full Screen'}
+              </span>
+            </button>
+          )}
+
+          {/* SEPARATE APPROACH BUTTON (1-TO-1 MESSAGES & CALLING) - ACCESSIBLE TO ANYONE */}
+          <div className="relative">
+            <button
+              onClick={onOpenChatList}
+              className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all cursor-pointer shadow-xs active:scale-95 group ${
+                incomingPop
+                  ? 'border-amber-400 bg-amber-400/20 text-[#7A131B] ring-2 ring-amber-400/50 animate-pulse'
+                  : 'border-[#DFCFC0] hover:border-[#7A131B] bg-white hover:bg-[#FAF7F2] text-stone-800 hover:text-[#7A131B]'
+              }`}
+              title="Open APPROACH (1-to-1 Messages & Calling)"
+              aria-label="APPROACH"
+            >
+              <div className="relative">
+                <Send size={14} className="rotate-[-20deg] text-[#7A131B] group-hover:scale-110 transition-transform" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[#7A131B] px-1 text-[9px] font-bold text-white shadow-xs">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+              <span className="text-xs font-bold tracking-wider font-classical hidden sm:inline">APPROACH</span>
+            </button>
+
+            {/* INCOMING MESSAGE POP NEAR APPROACH/INBOX BUTTON */}
+            {incomingPop && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenChatList();
+                }}
+                className="absolute top-11 right-0 w-60 sm:w-68 p-2.5 rounded-xl border shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-200 cursor-pointer text-left"
+                style={{
+                  backgroundColor: 'rgba(28, 16, 12, 0.96)',
+                  backdropFilter: 'blur(16px)',
+                  borderColor: 'rgba(245, 166, 35, 0.6)',
+                  boxShadow: '0 16px 36px -6px rgba(0, 0, 0, 0.7), 0 0 16px rgba(245, 166, 35, 0.25)',
+                }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+                  <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider">
+                    New message from {incomingPop.senderName}
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-200 line-clamp-1 mt-0.5 font-sans">
+                  {incomingPop.text}
+                </p>
+                <span className="text-[9px] text-amber-400 font-bold block mt-1">
+                  Tap to open chat ➔
+                </span>
+              </div>
+            )}
+          </div>
+
           {currentUser ? (
             <>
               {/* Upload Piece Button */}
@@ -125,20 +257,6 @@ export const Navigation: React.FC<NavigationProps> = ({
               >
                 <PlusCircle size={15} />
                 <span>Upload Work</span>
-              </button>
-
-              {/* Chat Button with unread counter */}
-              <button
-                onClick={onOpenChatList}
-                className="relative p-2 text-stone-700 hover:text-[#7A131B] hover:bg-[#F2EAE0] rounded-md transition-colors cursor-pointer"
-                aria-label="Direct Messages"
-              >
-                <MessageSquare size={19} />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[#7A131B] px-1 text-[10px] font-bold text-white shadow-xs">
-                    {unreadCount}
-                  </span>
-                )}
               </button>
 
               {/* User Avatar / Profile */}
@@ -175,13 +293,13 @@ export const Navigation: React.FC<NavigationProps> = ({
             <>
               <button
                 onClick={() => onOpenAuth('login')}
-                className="text-xs font-semibold text-stone-700 hover:text-[#7A131B] px-3 py-2 transition-colors cursor-pointer"
+                className="text-xs font-semibold text-stone-700 hover:text-[#7A131B] px-2.5 py-2 transition-colors cursor-pointer"
               >
                 Sign In
               </button>
               <button
                 onClick={() => onOpenAuth('signup')}
-                className="px-4 py-2 text-xs font-semibold text-white bg-[#7A131B] rounded-md hover:bg-[#8C1620] shadow-sm transition-all duration-150 cursor-pointer active:scale-95"
+                className="px-3.5 py-2 text-xs font-semibold text-white bg-[#7A131B] rounded-md hover:bg-[#8C1620] shadow-sm transition-all duration-150 cursor-pointer active:scale-95"
               >
                 Join as Artist
               </button>
@@ -201,8 +319,50 @@ export const Navigation: React.FC<NavigationProps> = ({
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-[#E5D9C8] bg-[#FAF7F2] px-4 py-4 space-y-3">
-          <div className="flex flex-col gap-2 text-sm font-medium text-stone-700">
+        <div
+          className={`md:hidden border-t px-4 py-4 space-y-3 transition-colors ${
+            isDarkMode ? 'border-amber-900/40 bg-[#2D1A12] text-amber-50' : 'border-[#E5D9C8] bg-white text-stone-700'
+          }`}
+        >
+          <div className="flex flex-col gap-2 text-sm font-medium">
+            {/* Mobile Dark mode button */}
+            <button
+              onClick={() => {
+                onToggleDarkMode?.();
+              }}
+              className={`flex items-center justify-between py-2.5 px-3 rounded-lg border font-semibold text-xs transition-colors cursor-pointer ${
+                isDarkMode
+                  ? 'bg-[#3D251A] text-amber-200 border-amber-500/40'
+                  : 'bg-stone-100 text-stone-800 border-stone-200 hover:bg-stone-200/60'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                {isDarkMode ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} className="text-stone-700" />}
+                <span className="font-bold">Dark mode (Chocolate Brown)</span>
+              </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isDarkMode ? 'bg-amber-400 text-stone-900' : 'bg-stone-300 text-stone-800'}`}>
+                {isDarkMode ? 'ON' : 'OFF'}
+              </span>
+            </button>
+
+            {/* Separate APPROACH item in mobile menu */}
+            <button
+              onClick={() => {
+                onOpenChatList();
+                setMobileMenuOpen(false);
+              }}
+              className="flex items-center justify-between py-2 px-3 bg-[#F5EFE6] text-[#7A131B] font-bold rounded"
+            >
+              <span className="flex items-center gap-2">
+                <Send size={15} className="rotate-[-20deg]" />
+                <span className="font-classical">APPROACH (1-to-1 Messages & Calls)</span>
+              </span>
+              {unreadCount > 0 && (
+                <span className="px-2 py-0.5 text-[10px] bg-[#7A131B] text-white rounded-full">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => handleNavClick('all', 'all')}
               className="text-left py-2 px-3 hover:bg-[#F2EAE0] rounded"
@@ -232,16 +392,6 @@ export const Navigation: React.FC<NavigationProps> = ({
               className="text-left py-2 px-3 hover:bg-[#F2EAE0] rounded"
             >
               Featured Portfolios
-            </button>
-            <button
-              onClick={() => {
-                if (onOpenGoogleDrive) onOpenGoogleDrive();
-                setMobileMenuOpen(false);
-              }}
-              className="text-left py-2 px-3 hover:bg-[#F2EAE0] rounded flex items-center gap-2 text-[#7A131B] font-medium"
-            >
-              <HardDrive size={14} />
-              <span>Google Drive Hub</span>
             </button>
           </div>
 

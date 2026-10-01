@@ -38,6 +38,7 @@ interface PortfolioModalProps {
   isCurrentUser: boolean;
   onOpenUpload?: () => void;
   onOpenEditProfile?: () => void;
+  isDarkMode?: boolean;
 }
 
 export const PortfolioModal: React.FC<PortfolioModalProps> = ({
@@ -49,8 +50,10 @@ export const PortfolioModal: React.FC<PortfolioModalProps> = ({
   isCurrentUser,
   onOpenUpload,
   onOpenEditProfile,
+  isDarkMode = false,
 }) => {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [slideDirection, setSlideDirection] = useState<'next' | 'prev'>('next');
   const [activeTab, setActiveTab] = useState<'works' | 'extended'>('works');
 
   // Review submission state for the active piece
@@ -87,6 +90,7 @@ export const PortfolioModal: React.FC<PortfolioModalProps> = ({
 
   const handleNextSlide = () => {
     if (artist.works.length <= 1) return;
+    setSlideDirection('next');
     const nextIdx = (currentSlideIndex + 1) % artist.works.length;
     setCurrentSlideIndex(nextIdx);
     setReviewSuccessMsg('');
@@ -94,6 +98,7 @@ export const PortfolioModal: React.FC<PortfolioModalProps> = ({
 
   const handlePrevSlide = () => {
     if (artist.works.length <= 1) return;
+    setSlideDirection('prev');
     const prevIdx = (currentSlideIndex - 1 + artist.works.length) % artist.works.length;
     setCurrentSlideIndex(prevIdx);
     setReviewSuccessMsg('');
@@ -119,13 +124,21 @@ export const PortfolioModal: React.FC<PortfolioModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto bg-stone-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto bg-stone-950/70 backdrop-blur-md animate-in fade-in duration-200">
       <div
-        className="relative w-full max-w-5xl bg-[#FAF7F2] rounded-xl border border-[#E5D9C8] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+        className={`relative w-full max-w-5xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] transition-colors duration-300 ${
+          isDarkMode
+            ? 'bg-[#2D1A12] border-amber-900/40 text-[#FAF5EE]'
+            : 'bg-[#FAF7F2] border-[#E5D9C8] text-stone-900'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5D9C8] bg-[#F5EFE6]">
+        <div
+          className={`flex items-center justify-between px-6 py-4 border-b transition-colors ${
+            isDarkMode ? 'border-white/10 bg-[#24150E] text-stone-200' : 'border-[#E5D9C8] bg-[#F5EFE6] text-stone-800'
+          }`}
+        >
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#7A131B]" />
             <span className="text-xs font-semibold uppercase tracking-wider text-stone-700">
@@ -467,15 +480,43 @@ export const PortfolioModal: React.FC<PortfolioModalProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="relative">
-                  <AnimatePresence mode="wait">
+                <div className="relative overflow-hidden">
+                  <AnimatePresence mode="wait" custom={slideDirection}>
                     {currentPiece && (
                       <motion.div
                         key={currentPiece.id}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -15 }}
-                        transition={{ duration: 0.3 }}
+                        custom={slideDirection}
+                        variants={{
+                          enter: (dir: 'next' | 'prev') => ({
+                            x: dir === 'next' ? 80 : -80,
+                            opacity: 0,
+                            scale: 0.985,
+                          }),
+                          center: {
+                            x: 0,
+                            opacity: 1,
+                            scale: 1,
+                            transition: {
+                              x: { type: 'spring', stiffness: 380, damping: 32, mass: 0.8 },
+                              opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] },
+                              scale: { duration: 0.24, ease: [0.22, 1, 0.36, 1] },
+                            },
+                          },
+                          exit: (dir: 'next' | 'prev') => ({
+                            x: dir === 'next' ? -80 : 80,
+                            opacity: 0,
+                            scale: 0.985,
+                            transition: {
+                              x: { type: 'spring', stiffness: 380, damping: 32, mass: 0.8 },
+                              opacity: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
+                              scale: { duration: 0.2 },
+                            },
+                          }),
+                        }}
+                        initial="enter"
+                        animate="center"
+                        exit="exit"
+                        style={{ willChange: 'transform, opacity' }}
                         className="p-5 sm:p-6 rounded-xl bg-[#F5EFE6] border border-[#E5D9C8] space-y-5 paper-card"
                       >
                         {/* Piece Title & Role Header */}
@@ -654,6 +695,29 @@ export const PortfolioModal: React.FC<PortfolioModalProps> = ({
                       </motion.div>
                     )}
                   </AnimatePresence>
+
+                  {/* 60FPS Hardware-Accelerated Interactive Slide Indicator Dots */}
+                  {artist.works.length > 1 && (
+                    <div className="flex items-center justify-center gap-2 pt-3">
+                      {artist.works.map((piece, idx) => (
+                        <button
+                          key={piece.id}
+                          onClick={() => {
+                            setSlideDirection(idx > currentSlideIndex ? 'next' : 'prev');
+                            setCurrentSlideIndex(idx);
+                            setReviewSuccessMsg('');
+                          }}
+                          className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                            idx === currentSlideIndex
+                              ? 'w-8 bg-[#7A131B] shadow-xs'
+                              : 'w-2 bg-stone-300 hover:bg-stone-400'
+                          }`}
+                          title={`Slide ${idx + 1}: ${piece.title}`}
+                          aria-label={`Jump to slide ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

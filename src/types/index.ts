@@ -49,6 +49,7 @@ export interface ArtistProfile {
   name: string;
   stageName?: string;
   role: ArtistRole;
+  isOnline?: boolean;
   genre: MusicGenre[];
   email: string;
   phone: string;
@@ -103,4 +104,18 @@ export interface Conversation {
   lastTimestamp: string;
   unreadCount: number;
   messages: ChatMessage[];
+}
+
+export interface CommunityExperience {
+  id: string;
+  artistId: string;
+  authorName: string;
+  authorRole: ArtistRole;
+  authorAvatar?: string;
+  rating: number; // 1 to 5
+  title?: string;
+  experienceText: string;
+  collaborationOutcome?: string;
+  createdAt: string;
+  isRegisteredUser: boolean;
 }

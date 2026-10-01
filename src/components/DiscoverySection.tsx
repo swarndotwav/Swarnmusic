@@ -12,6 +12,8 @@ import {
   Check,
   Sparkles,
   PlusCircle,
+  Radio,
+  Users,
 } from 'lucide-react';
 import { ArtistProfile, ArtistRole, MusicGenre, WorkPiece } from '../types';
 import { AudioPlayer } from './AudioPlayer';
@@ -25,6 +27,7 @@ interface DiscoverySectionProps {
   onShareArtist?: (artist: ArtistProfile) => void;
   currentUserId?: string;
   onOpenUpload?: () => void;
+  onOpenRegister?: () => void;
 }
 
 const GENRE_LIST: MusicGenre[] = [
@@ -47,6 +50,7 @@ export const DiscoverySection: React.FC<DiscoverySectionProps> = ({
   onShareArtist,
   currentUserId,
   onOpenUpload,
+  onOpenRegister,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
@@ -70,9 +74,26 @@ export const DiscoverySection: React.FC<DiscoverySectionProps> = ({
   const filteredArtists = useMemo(() => {
     return artists
       .filter((artist) => {
-        // Role match
-        if (selectedRoleFilter !== 'all' && artist.role !== selectedRoleFilter) {
-          return false;
+        // Online & Offline Presence Filter
+        if (selectedRoleFilter === 'active' || selectedRoleFilter === 'online') {
+          // Show users currently active in the app
+          const isUserOnline =
+            artist.isOnline ??
+            (artist.id === currentUserId ||
+              ['artist-1', 'artist-2', 'artist-4', 'artist-5'].includes(artist.id));
+          if (!isUserOnline) return false;
+        } else if (selectedRoleFilter === 'inactive' || selectedRoleFilter === 'offline') {
+          // Show registered users who are currently inactive
+          const isUserOnline =
+            artist.isOnline ??
+            (artist.id === currentUserId ||
+              ['artist-1', 'artist-2', 'artist-4', 'artist-5'].includes(artist.id));
+          if (isUserOnline) return false;
+        } else if (selectedRoleFilter !== 'all') {
+          // Standard discipline filter
+          if (artist.role !== selectedRoleFilter) {
+            return false;
+          }
         }
 
         // Genre match
@@ -195,26 +216,76 @@ export const DiscoverySection: React.FC<DiscoverySectionProps> = ({
 
         {/* Bottom: Role Filter Tabs + Genre Dropdown */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#E5D9C8]">
-          {/* Functional Segmented Role Control */}
-          <div className="inline-flex p-1 bg-[#EBE3D7] rounded-lg gap-1 text-xs font-medium">
+          {/* Liquid Glass Segmented Disciplines Control */}
+          <div className="liquid-glass-track p-1 rounded-xl flex flex-wrap items-center gap-1.5 text-xs font-medium">
             {[
-              { id: 'all', label: 'All Disciplines' },
-              { id: 'singer', label: 'Singers' },
-              { id: 'composer', label: 'Composers' },
-              { id: 'lyricist', label: 'Lyricists' },
-            ].map((roleTab) => (
-              <button
-                key={roleTab.id}
-                onClick={() => onFilterRoleChange(roleTab.id)}
-                className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
-                  selectedRoleFilter === roleTab.id
-                    ? 'bg-white text-[#7A131B] font-semibold shadow-xs'
-                    : 'text-stone-700 hover:text-stone-900'
-                }`}
-              >
-                {roleTab.label}
-              </button>
-            ))}
+              { id: 'all', label: 'All Disciplines', icon: Sparkles },
+              { id: 'active', label: 'Active', icon: Radio },
+              { id: 'inactive', label: 'Inactive', icon: Users },
+              { id: 'singer', label: 'Singers', icon: Mic },
+              { id: 'composer', label: 'Composers', icon: SlidersHorizontal },
+              { id: 'lyricist', label: 'Lyricists', icon: BookOpen },
+            ].map((roleTab) => {
+              const Icon = roleTab.icon;
+              const isSelected = selectedRoleFilter === roleTab.id || (roleTab.id === 'active' && selectedRoleFilter === 'online') || (roleTab.id === 'inactive' && selectedRoleFilter === 'offline');
+              let count = artists.length;
+              if (roleTab.id === 'active') {
+                count = artists.filter(
+                  (a) =>
+                    a.isOnline ??
+                    (a.id === currentUserId ||
+                      ['artist-1', 'artist-2', 'artist-4', 'artist-5'].includes(a.id))
+                ).length;
+              } else if (roleTab.id === 'inactive') {
+                count = artists.filter(
+                  (a) =>
+                    !(a.isOnline ??
+                    (a.id === currentUserId ||
+                      ['artist-1', 'artist-2', 'artist-4', 'artist-5'].includes(a.id)))
+                ).length;
+              } else if (roleTab.id !== 'all') {
+                count = artists.filter((a) => a.role === roleTab.id).length;
+              }
+
+              return (
+                <button
+                  key={roleTab.id}
+                  onClick={() => onFilterRoleChange(roleTab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg transition-all duration-200 cursor-pointer ${
+                    isSelected
+                      ? 'liquid-glass-pill text-[#7A131B] font-bold shadow-md animate-liquid-switch'
+                      : 'text-stone-700 hover:text-stone-900 hover:bg-white/40'
+                  }`}
+                  style={{
+                    willChange: 'transform, opacity',
+                    transform: 'translate3d(0, 0, 0)',
+                  }}
+                >
+                  <Icon
+                    size={14}
+                    className={
+                      roleTab.id === 'active' && isSelected
+                        ? 'text-emerald-600 animate-pulse'
+                        : isSelected
+                        ? 'text-[#7A131B]'
+                        : 'text-stone-500'
+                    }
+                  />
+                  <span>{roleTab.label}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                      isSelected
+                        ? roleTab.id === 'active'
+                          ? 'bg-emerald-500/15 text-emerald-700 font-bold'
+                          : 'bg-[#7A131B]/10 text-[#7A131B] font-bold'
+                        : 'bg-stone-300/40 text-stone-600'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Genre Filter */}
@@ -237,7 +308,41 @@ export const DiscoverySection: React.FC<DiscoverySectionProps> = ({
       </div>
 
       {/* Artist Grid */}
-      {filteredArtists.length === 0 ? (
+      {artists.length === 0 ? (
+        <div className="p-10 sm:p-14 text-center rounded-xl bg-[#F5EFE6] border border-[#E5D9C8] space-y-4 max-w-2xl mx-auto shadow-xs">
+          <div className="w-12 h-12 rounded-full bg-[#FAF7F2] border border-[#7A131B]/30 flex items-center justify-center mx-auto text-[#7A131B]">
+            <Sparkles size={22} />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-lg font-bold font-display text-stone-900">
+              The Stage Awaits Its Real Creators
+            </h3>
+            <p className="text-xs text-stone-700 max-w-md mx-auto leading-relaxed">
+              We have eliminated all artificial AI personas from the platform. Be the first singer, composer, or lyricist to publish your public portfolio!
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            {onOpenRegister && (
+              <button
+                onClick={onOpenRegister}
+                className="px-5 py-2.5 text-xs font-semibold text-white bg-[#7A131B] hover:bg-[#8C1620] rounded-md transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <PlusCircle size={14} />
+                <span>Register Your Portfolio</span>
+              </button>
+            )}
+            <a
+              href="https://www.instagram.com/swarn.wav?stkn=MWpmMjR2OTVzOWdkMw=="
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2.5 text-xs font-semibold text-stone-800 bg-white border border-[#E5D9C8] hover:bg-[#FAF7F2] rounded-md transition-colors cursor-pointer"
+            >
+              Join the Community
+            </a>
+          </div>
+        </div>
+      ) : filteredArtists.length === 0 ? (
         <div className="p-12 text-center rounded-xl bg-[#F5EFE6] border border-[#E5D9C8] space-y-3">
           <Music className="w-10 h-10 text-stone-600 mx-auto" />
           <h3 className="text-base font-semibold text-stone-900">No artists found matching your criteria</h3>
@@ -256,7 +361,10 @@ export const DiscoverySection: React.FC<DiscoverySectionProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div
+          key={selectedRoleFilter}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in-[0.99] duration-300"
+        >
           {filteredArtists.map((artist) => {
             const roleInfo = getRoleLabel(artist.role);
             const RoleIcon = roleInfo.icon;

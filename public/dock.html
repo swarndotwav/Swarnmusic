@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Swarn Music - Liquid Glass Floating Pill Navigation</title>
+  <style>
+    /* ==========================================================================
+       CSS RESET & DESIGN TOKENS
+       ========================================================================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    :root {
+      --bg-dark: #0a0a0c;
+      --dock-bg: rgba(18, 18, 20, 0.72);
+      --dock-border: rgba(255, 255, 255, 0.12);
+      --dock-blur: blur(28px) saturate(190%);
+      
+      --active-crimson: #7A131B;
+      --active-crimson-bright: #9E1B25;
+      --active-amber: #F5A623;
+      --text-primary: #FFFFFF;
+      --text-muted: rgba(255, 255, 255, 0.55);
+      
+      --spring-easing: cubic-bezier(0.25, 1, 0.5, 1);
+      --fluid-speed: 0.42s;
+    }
+
+    body {
+      min-height: 100vh;
+      background-color: var(--bg-dark);
+      color: #F3F1EC;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* ==========================================================================
+       ANIMATED LIQUID GRADIENT MESH BACKGROUND (Visible glass refraction)
+       ========================================================================== */
+    .ambient-background {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.65;
+      will-change: transform;
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+
+    .orb-1 {
+      width: 520px;
+      height: 520px;
+      background: radial-gradient(circle, #7A131B 0%, #46090e 65%, transparent 70%);
+      top: -100px;
+      left: -80px;
+      animation-duration: 22s;
+    }
+
+    .orb-2 {
+      width: 480px;
+      height: 480px;
+      background: radial-gradient(circle, #b96919 0%, #683008 65%, transparent 70%);
+      bottom: -60px;
+      right: -60px;
+      animation-duration: 17s;
+      animation-delay: -5s;
+    }
+
+    .orb-3 {
+      width: 380px;
+      height: 380px;
+      background: radial-gradient(circle, #4a154b 0%, #200721 65%, transparent 70%);
+      bottom: 25%;
+      left: 20%;
+      animation-duration: 25s;
+      animation-delay: -10s;
+    }
+
+    .orb-4 {
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, #d9822b 0%, transparent 65%);
+      top: 35%;
+      right: 15%;
+      opacity: 0.35;
+      animation-duration: 20s;
+      animation-delay: -2s;
+    }
+
+    @keyframes drift {
+      0% { transform: translate3d(0, 0, 0) scale(1); }
+      50% { transform: translate3d(40px, -35px, 0) scale(1.12); }
+      100% { transform: translate3d(-35px, 45px, 0) scale(0.92); }
+    }
+
+    /* Subtle acoustic grid overlay */
+    .ambient-grid {
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* ==========================================================================
+       MAIN CONTENT CONTAINER & TAB PAGES
+       ========================================================================== */
+    .app-viewport {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 32px 20px 140px 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .view-card {
+      display: none;
+      opacity: 0;
+      transform: translateY(12px) scale(0.985);
+      transition: opacity 0.38s ease, transform 0.38s var(--spring-easing);
+    }
+
+    .view-card.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    /* Header Brand */
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: rgba(122, 19, 27, 0.25);
+      border: 1px solid rgba(122, 19, 27, 0.5);
+      color: #ff9da4;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* ==========================================================================
+       CARD 1: HOME (Introduction & Registered Artists)
+       ========================================================================== */
+    .hero-banner {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 28px;
+      margin-bottom: 24px;
+      backdrop-filter: blur(12px);
+    }
+
+    .hero-title {
+      font-size: clamp(22px, 3.8vw, 36px);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #ffffff 40%, #e8c5a0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      max-width: 640px;
+      line-height: 1.5;
+    }
+
+    .artists-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .artist-card {
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    .artist-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.055);
+    }
+
+    .artist-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .artist-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      object-cover: cover;
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .artist-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #FFF;
+    }
+
+    .artist-role-tag {
+      font-size: 11px;
+      font-weight: 600;
+      color: #f7a072;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .artist-bio {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.45;
+    }
+
+    .artist-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag-chip {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* ==========================================================================
+       CARD 2: INBOX (Approach Messages & Calling Box)
+       ========================================================================== */
+    .inbox-layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      overflow: hidden;
+      min-height: 460px;
+      backdrop-filter: blur(16px);
+    }
+
+    @media (max-width: 768px) {
+      .inbox-layout {
+        grid-template-columns: 1fr;
+      }
+      .inbox-sidebar {
+        display: none;
+      }
+    }
+
+    .inbox-sidebar {
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .inbox-thread-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      background: transparent;
+      transition: background 0.15s ease;
+    }
+
+    .inbox-thread-item.active,
+    .inbox-thread-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .inbox-chat-view {
+      display: flex;
+      flex-direction: column;
+      padding: 18px;
+    }
+
+    .inbox-chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .inbox-messages {
+      flex: 1;
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    .message-bubble {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .message-bubble.incoming {
+      align-self: flex-start;
+      background: rgba(255, 255, 255, 0.08);
+      color: #EEE;
+    }
+
+    .message-bubble.outgoing {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #7A131B 0%, #9E1B25 100%);
+      color: #FFF;
+      box-shadow: 0 4px 14px rgba(122, 19, 27, 0.4);
+    }
+
+    .inbox-input-row {
+      display: flex;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .inbox-input {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 9999px;
+      padding: 10px 18px;
+      color: #FFF;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .inbox-input:focus {
+      border-color: #f7a072;
+    }
+
+    .inbox-send-btn {
+      background: #7A131B;
+      color: #FFF;
+      border: none;
+      border-radius: 9999px;
+      padding: 0 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .inbox-send-btn:hover {
+      background: #9E1B25;
+    }
+
+    /* ==========================================================================
+       CARD 3: PROFILE (Personal & Professional Details)
+       ========================================================================== */
+    .profile-hero {
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      backdrop-filter: blur(14px);
+      margin-bottom: 20px;
+    }
+
+    .profile-head-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .profile-avatar-large {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      border: 2px solid #7A131B;
+      box-shadow: 0 6px 18px rgba(122, 19, 27, 0.4);
+      object-fit: cover;
+    }
+
+    .profile-info {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .profile-details-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .detail-card {
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .detail-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #f7a072;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .detail-value {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.85);
+      line-height: 1.45;
+    }
+
+    /* ==========================================================================
+       THE LIQUID GLASS FLOATING PILL DOCK (Core Deliverable)
+       ========================================================================== */
+    .dock-wrapper {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      pointer-events: auto;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* Base Dock Container */
+    .liquid-dock {
+      position: relative;
+      display: flex;
+      align-items: center;
+      background: var(--dock-bg);
+      backdrop-filter: var(--dock-blur);
+      -webkit-backdrop-filter: var(--dock-blur);
+      border: 1px solid var(--dock-border);
+      border-radius: 9999px;
+      padding: 5px;
+      box-shadow: 
+        0 24px 48px -12px rgba(0, 0, 0, 0.75),
+        0 8px 18px -4px rgba(0, 0, 0, 0.45),
+        inset 0 1px 1.5px rgba(255, 255, 255, 0.16),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.4);
+      isolation: isolate;
+    }
+
+    /* Liquid Gliding Active Capsule (Fluid morphing pill with spring physics) */
+    .liquid-capsule {
+      position: absolute;
+      top: 5px;
+      bottom: 5px;
+      left: 0;
+      width: 0;
+      border-radius: 9999px;
+      pointer-events: none;
+      z-index: 1;
+      
+      /* Elevated Glossy Specular Finish */
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.22) 0%,
+        rgba(255, 255, 255, 0.08) 45%,
+        rgba(255, 255, 255, 0.02) 100%
+      ),
+      linear-gradient(135deg, rgba(122, 19, 27, 0.88) 0%, rgba(158, 27, 37, 0.94) 100%);
+      
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      
+      box-shadow: 
+        0 8px 20px -3px rgba(122, 19, 27, 0.55),
+        0 2px 6px rgba(0, 0, 0, 0.35),
+        inset 0 1px 1px rgba(255, 255, 255, 0.7),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+      
+      will-change: transform, width, left;
+      transform-origin: center center;
+      transition: 
+        left var(--fluid-speed) var(--spring-easing),
+        width var(--fluid-speed) var(--spring-easing),
+        transform var(--fluid-speed) var(--spring-easing);
+    }
+
+    /* Viscous Fluid Horizontal Stretch Class during transit */
+    .liquid-capsule.stretching-right {
+      transform: scaleX(1.16) scaleY(0.92);
+    }
+
+    .liquid-capsule.stretching-left {
+      transform: scaleX(1.16) scaleY(0.92);
+    }
+
+    /* Top Specular Sheen inside the active capsule */
+    .liquid-capsule::before {
+      content: '';
+      position: absolute;
+      top: 1px;
+      left: 12%;
+      right: 12%;
+      height: 40%;
+      border-radius: 9999px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 100%);
+      pointer-events: none;
+    }
+
+    /* Navigation Tab Buttons */
+    .dock-btn {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      outline: none;
+      cursor: pointer;
+      padding: 9px 15px;
+      border-radius: 9999px;
+      color: var(--text-muted);
+      transition: color 0.25s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .dock-btn:hover {
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .dock-btn.active {
+      color: var(--text-primary);
+    }
+
+    /* Icon transitions (Muted 55% -> 100% white) */
+    .dock-icon-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      opacity: 0.58;
+      transform: scale(0.94);
+      transition: opacity 0.24s ease, transform 0.24s var(--spring-easing);
+      flex-shrink: 0;
+    }
+
+    .dock-btn:hover .dock-icon-box {
+      opacity: 0.88;
+      transform: scale(1);
+    }
+
+    .dock-btn.active .dock-icon-box {
+      opacity: 1;
+      transform: scale(1.02);
+      filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+    }
+
+    .dock-icon-box svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Smooth Label Expansion (0px width -> natural text width) */
+    .dock-label {
+      display: inline-block;
+      max-width: 0;
+      opacity: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-left: 0;
+      transform: translateX(-4px);
+      transition: 
+        max-width var(--fluid-speed) var(--spring-easing),
+        opacity 0.25s ease,
+        margin-left var(--fluid-speed) var(--spring-easing),
+        transform 0.25s var(--spring-easing);
+    }
+
+    .dock-btn.active .dock-label {
+      max-width: 80px;
+      opacity: 1;
+      margin-left: 8px;
+      transform: translateX(0);
+    }
+
+    /* Unread badge on Inbox */
+    .dock-badge {
+      position: absolute;
+      top: 6px;
+      right: 12px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--active-amber);
+      box-shadow: 0 0 8px var(--active-amber);
+    }
+
+    .dock-btn.active .dock-badge {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. ANIMATED LIQUID GRADIENT MESH BACKGROUND -->
+  <div class="ambient-background" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+    <div class="ambient-grid"></div>
+  </div>
+
+  <!-- 2. MAIN APPLICATION VIEWS -->
+  <main class="app-viewport">
+    
+    <!-- Top Header -->
+    <header class="brand-header">
+      <div class="brand-logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7A131B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="12" cy="12" r="4"/>
+          <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/>
+          <line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/>
+          <line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/>
+          <line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>
+        </svg>
+        <span>swarnmusic</span>
+      </div>
+      <div class="brand-badge">Acoustic Collaboration Dock</div>
+    </header>
+
+    <!-- VIEW 1: HOME (Introduction & Registered Artists) -->
+    <section id="view-home" class="view-card active">
+      <div class="hero-banner">
+        <h1 class="hero-title">An Artisanal Stage for Indian Musicians</h1>
+        <p class="hero-subtitle">
+          Connect directly with authentic classical and acoustic creators. Listen to original vocal takes, sitar compositions, and lyrical poetry with zero middlemen.
+        </p>
+      </div>
+
+      <div class="artists-grid">
+        <!-- Artist 1 -->
+        <div class="artist-card">
+          <div class="artist-head">
+            <img class="artist-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80" alt="Aarav Sharma">
+            <div>
+              <div class="artist-name">Aarav Sharma</div>
+              <div class="artist-role-tag">Singer & Vocalist</div>
+            </div>
+          </div>
+          <p class="artist-bio">Trained in Kirana Gharana, blending traditional khayal with contemporary acoustic lo-fi melodies.</p>
+          <div class="artist-tags">
+            <span class="tag-chip">Hindustani</span>
+            <span class="tag-chip">Raga Yaman</span>
+            <span class="tag-chip">Lo-Fi Acoustic</span>
+          </div>
+        </div>
+
+        <!-- Artist 2 -->
+        <div class="artist-card">
+          <div class="artist-head">
+            <img class="artist-avatar" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=80" alt="Vikramaditya Roy">
+            <div>
+              <div class="artist-name">Vikramaditya Roy</div>
+              <div class="artist-role-tag">Composer & Producer</div>
+            </div>
+          </div>
+          <p class="artist-bio">Crafting evocative orchestral sweeps, bansuri arrangements, and ambient devotional scores for indie films.</p>
+          <div class="artist-tags">
+            <span class="tag-chip">Cinematic</span>
+            <span class="tag-chip">Bansuri Stems</span>
+            <span class="tag-chip">Logic Pro X</span>
+          </div>
+        </div>
+
+        <!-- Artist 3 -->
+        <div class="artist-card">
+          <div class="artist-head">
+            <img class="artist-avatar" src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=160&q=80" alt="Meera Nambiar">
+            <div>
+              <div class="artist-name">Meera Nambiar</div>
+              <div class="artist-role-tag">Lyricist & Poet</div>
+            </div>
+          </div>
+          <p class="artist-bio">Writing evocative verses in Hindi, Urdu, and Malayalam. Specializes in nazms and heartfelt acoustic ballads.</p>
+          <div class="artist-tags">
+            <span class="tag-chip">Urdu Shayari</span>
+            <span class="tag-chip">Sufi Verses</span>
+            <span class="tag-chip">Acoustic Meter</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: SEARCH (Search Artists Menu) -->
+    <section id="view-search" class="view-card">
+      <div style="max-width: 650px; margin: 0 auto; padding: 10px;">
+        <div style="margin-bottom: 18px;">
+          <h2 style="font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px;">Search Creators Directory</h2>
+          <p style="font-size: 13px; color: #a8a29e;">Find verified singers, composers, and lyricists by stage name, real name, or role category.</p>
+        </div>
+
+        <!-- Search Input Bar -->
+        <div style="position: relative; margin-bottom: 16px;">
+          <input 
+            type="text" 
+            id="dock-search-input" 
+            placeholder="Type stage name, name, or role (e.g. Aarav, Singer, Lyricist)..." 
+            style="width: 100%; padding: 14px 18px 14px 44px; border-radius: 14px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; font-size: 14px; outline: none;"
+          />
+          <svg style="position: absolute; left: 16px; top: 16px; width: 18px; height: 18px; stroke: #f7a072; fill: none; stroke-width: 2;" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+
+        <!-- Search Results List -->
+        <div id="dock-search-results" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Item 1 -->
+          <div class="search-result-item" data-search="aarav sharma singer vocalist hindustani" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255, 255, 255, 0.2);" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80" alt="Aarav">
+              <div>
+                <div style="font-size: 13px; font-weight: 700; color: #fff;">Aarav Sharma <span style="font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 9999px; background: rgba(245, 166, 35, 0.2); color: #f5a623; border: 1px solid rgba(245, 166, 35, 0.3);">Stage: "Aarav"</span></div>
+                <div style="font-size: 11px; color: #a8a29e;">Singer · Hindustani Classical · <span style="color: #4ade80;">● Active</span></div>
+              </div>
+            </div>
+            <span style="font-size: 11px; font-weight: 600; color: #f7a072; padding: 6px 12px; border-radius: 8px; background: rgba(247, 160, 114, 0.12);">View</span>
+          </div>
+
+          <!-- Item 2 -->
+          <div class="search-result-item" data-search="kabir deshmukh composer music director fusion" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255, 255, 255, 0.2);" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=80" alt="Kabir">
+              <div>
+                <div style="font-size: 13px; font-weight: 700; color: #fff;">Kabir Deshmukh <span style="font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 9999px; background: rgba(245, 166, 35, 0.2); color: #f5a623; border: 1px solid rgba(245, 166, 35, 0.3);">Stage: "Kabir"</span></div>
+                <div style="font-size: 11px; color: #a8a29e;">Composer · Sarod & Fusion · <span style="color: #4ade80;">● Active</span></div>
+              </div>
+            </div>
+            <span style="font-size: 11px; font-weight: 600; color: #f7a072; padding: 6px 12px; border-radius: 8px; background: rgba(247, 160, 114, 0.12);">View</span>
+          </div>
+
+          <!-- Item 3 -->
+          <div class="search-result-item" data-search="meera nambiar lyricist songwriter poet urdu nazm" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255, 255, 255, 0.2);" src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=160&q=80" alt="Meera">
+              <div>
+                <div style="font-size: 13px; font-weight: 700; color: #fff;">Meera Nambiar <span style="font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 9999px; background: rgba(245, 166, 35, 0.2); color: #f5a623; border: 1px solid rgba(245, 166, 35, 0.3);">Stage: "Sufi Poet"</span></div>
+                <div style="font-size: 11px; color: #a8a29e;">Lyricist · Urdu & Hindi Poetry · <span style="color: #a8a29e;">○ Inactive</span></div>
+              </div>
+            </div>
+            <span style="font-size: 11px; font-weight: 600; color: #f7a072; padding: 6px 12px; border-radius: 8px; background: rgba(247, 160, 114, 0.12);">View</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: INBOX (Approach Messages & Calling Box) -->
+    <section id="view-inbox" class="view-card">
+      <div class="inbox-layout">
+        <aside class="inbox-sidebar">
+          <div style="font-size: 11px; font-weight: 700; color: #f7a072; text-transform: uppercase; padding: 6px 10px;">
+            Active Approaches
+          </div>
+          <div class="inbox-thread-item active">
+            <img style="width: 36px; height: 36px; border-radius: 10px;" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80" alt="Aarav">
+            <div style="flex: 1; overflow: hidden;">
+              <div style="font-size: 13px; font-weight: 600;">Aarav Sharma</div>
+              <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Sent Raga Bhairav vocal stem...</div>
+            </div>
+          </div>
+          <div class="inbox-thread-item">
+            <img style="width: 36px; height: 36px; border-radius: 10px;" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=80" alt="Vikram">
+            <div style="flex: 1; overflow: hidden;">
+              <div style="font-size: 13px; font-weight: 600;">Vikramaditya Roy</div>
+              <div style="font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Can you record harmonium for chorus?</div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="inbox-chat-view">
+          <div class="inbox-chat-header">
+            <div>
+              <div style="font-size: 14px; font-weight: 700;">Aarav Sharma · Singer</div>
+              <div style="font-size: 11px; color: #10B981; display: flex; align-items: center; gap: 5px;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: #10B981;"></span>
+                Online in Studio
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #FFF; border-radius: 8px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer;">
+                Audio Call
+              </button>
+            </div>
+          </div>
+
+          <div class="inbox-messages" id="chat-messages">
+            <div class="message-bubble incoming">
+              Namaste! Heard your acoustic sarod recordings on swarnmusic. Would love to collaborate on my upcoming indie fusion track.
+            </div>
+            <div class="message-bubble outgoing">
+              Namaste Aarav! Thank you so much. I would love to hear the scratch track and tempo!
+            </div>
+            <div class="message-bubble incoming">
+              Sending you the 90 BPM stems right now. Let's arrange a quick studio audio call!
+            </div>
+          </div>
+
+          <div class="inbox-input-row">
+            <input type="text" id="chat-input" class="inbox-input" placeholder="Type a message or approach note...">
+            <button id="chat-send" class="inbox-send-btn">Send</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: PROFILE (Personal & Professional Details) -->
+    <section id="view-profile" class="view-card">
+      <div class="profile-hero">
+        <div class="profile-head-row">
+          <img class="profile-avatar-large" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=240&q=80" alt="Kalyan Dev">
+          <div class="profile-info">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+              <h2 style="font-size: 20px; font-weight: 800;">Kalyan Dev</h2>
+              <span style="font-size: 11px; background: #7A131B; padding: 2px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase;">
+                Verified Creator
+              </span>
+            </div>
+            <div style="font-size: 13px; color: #f7a072; font-weight: 600; margin-bottom: 6px;">
+              Category: Composer & Multi-Instrumentalist
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted);">
+              Bengaluru, Karnataka · Member since 2025 · 14 Published Stems
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-details-grid">
+          <div class="detail-card">
+            <div class="detail-label">Personal Statement & Bio</div>
+            <div class="detail-value">
+              Passionate sound architect exploring the continuum between traditional Indian ragas and organic acoustic textures.
+            </div>
+          </div>
+          <div class="detail-card">
+            <div class="detail-label">Mastered Instruments</div>
+            <div class="detail-value">
+              Sarod, Harmonium, Acoustic 12-string Guitar, Modular Synth Pads.
+            </div>
+          </div>
+          <div class="detail-card">
+            <div class="detail-label">Primary Influences</div>
+            <div class="detail-value">
+              Ustad Ali Akbar Khan, Pt. Hariprasad Chaurasia, Nitin Sawhney, Anoushka Shankar.
+            </div>
+          </div>
+          <div class="detail-card">
+            <div class="detail-label">Studio & Software Mastery</div>
+            <div class="detail-value">
+              Logic Pro X, Ableton Live 12, UAD Apollo Twin, Rode NT1-A condenser mic.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==========================================================================
+       3. STANDALONE FLOATING LIQUID GLASS PILL DOCK
+       ========================================================================== -->
+  <div class="dock-wrapper">
+    <nav class="liquid-dock" id="nav-dock" role="navigation" aria-label="Main Floating Navigation">
+      
+      <!-- Liquid Gliding Active Capsule -->
+      <div class="liquid-capsule" id="liquid-capsule"></div>
+
+      <!-- Item 1: Home (Icon Only) -->
+      <button class="dock-btn active" data-target="view-home" aria-label="Home - Website Introduction & Artists" title="Home">
+        <span class="dock-icon-box">
+          <svg viewBox="0 0 24 24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </span>
+      </button>
+
+      <!-- Item 2: Search (Icon Only) -->
+      <button class="dock-btn" data-target="view-search" aria-label="Search Artists Menu" title="Search by Stage Name/Name/Role">
+        <span class="dock-icon-box">
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </span>
+      </button>
+
+      <!-- Item 3: Inbox (Icon Only) -->
+      <button class="dock-btn" data-target="view-inbox" aria-label="Inbox - Approach Messages" title="Inbox">
+        <span class="dock-icon-box">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </span>
+        <span class="dock-badge" title="New approach received"></span>
+      </button>
+
+      <!-- Item 4: Profile (Icon Only) -->
+      <button class="dock-btn" data-target="view-profile" aria-label="Profile - Personal and Professional Details" title="Profile">
+        <span class="dock-icon-box">
+          <svg viewBox="0 0 24 24">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </span>
+      </button>
+
+    </nav>
+  </div>
+
+  <!-- ==========================================================================
+       VANILLA JAVASCRIPT: MICRO-INTERACTIONS & FLUID VISCOUS KINEMATICS
+       ========================================================================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      const dock = document.getElementById('nav-dock');
+      const capsule = document.getElementById('liquid-capsule');
+      const buttons = Array.from(dock.querySelectorAll('.dock-btn'));
+      const views = document.querySelectorAll('.view-card');
+
+      let currentActiveIndex = 0;
+      let isAnimating = false;
+
+      /**
+       * Updates the position, width, and liquid viscous physics of the sliding capsule
+       */
+      function updateCapsulePosition(activeBtn, prevIndex = -1, nextIndex = 0) {
+        if (!activeBtn) return;
+
+        const dockRect = dock.getBoundingClientRect();
+        const btnRect = activeBtn.getBoundingClientRect();
+
+        const targetLeft = btnRect.left - dockRect.left;
+        const targetWidth = btnRect.width;
+
+        // Apply directional fluid stretch during transit
+        if (prevIndex !== -1 && prevIndex !== nextIndex) {
+          const movingRight = nextIndex > prevIndex;
+          capsule.classList.remove('stretching-left', 'stretching-right');
+          capsule.classList.add(movingRight ? 'stretching-right' : 'stretching-left');
+
+          // Snap back to spherical capsule upon arrival
+          setTimeout(() => {
+            capsule.classList.remove('stretching-left', 'stretching-right');
+          }, 240);
+        }
+
+        capsule.style.left = targetLeft + 'px';
+        capsule.style.width = targetWidth + 'px';
+      }
+
+      /**
+       * Switches active tab with smooth view cross-fade
+       */
+      function selectTab(btn, index) {
+        if (index === currentActiveIndex && !isAnimating) return;
+
+        const prevIndex = currentActiveIndex;
+        currentActiveIndex = index;
+
+        // Update button active state classes
+        buttons.forEach((b, i) => {
+          if (i === index) {
+            b.classList.add('active');
+          } else {
+            b.classList.remove('active');
+          }
+        });
+
+        // Compute capsule alignment immediately and re-align post label expansion
+        updateCapsulePosition(btn, prevIndex, index);
+
+        // Account for font-rendering & label transition completion
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            updateCapsulePosition(btn, -1, index);
+          }, 200);
+        });
+
+        // Switch visible view
+        const targetViewId = btn.getAttribute('data-target');
+        views.forEach((view) => {
+          if (view.id === targetViewId) {
+            view.classList.add('active');
+          } else {
+            view.classList.remove('active');
+          }
+        });
+      }
+
+      // Attach click events to dock tabs
+      buttons.forEach((btn, index) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          selectTab(btn, index);
+        });
+      });
+
+      // Simple interactive chat test in Inbox
+      const chatInput = document.getElementById('chat-input');
+      const chatSend = document.getElementById('chat-send');
+      const chatMessages = document.getElementById('chat-messages');
+
+      function sendMessage() {
+        if (!chatInput) return;
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble outgoing';
+        bubble.textContent = text;
+        chatMessages.appendChild(bubble);
+        chatInput.value = '';
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Simulated reply
+        setTimeout(() => {
+          const reply = document.createElement('div');
+          reply.className = 'message-bubble incoming';
+          reply.textContent = 'Received! The acoustic texture in your sample sounds sublime.';
+          chatMessages.appendChild(reply);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        }, 1100);
+      }
+
+      if (chatSend && chatInput) {
+        chatSend.addEventListener('click', sendMessage);
+        chatInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') sendMessage();
+        });
+      }
+
+      // Initial alignment on load & resize
+      window.addEventListener('load', () => {
+        updateCapsulePosition(buttons[0], -1, 0);
+      });
+
+      window.addEventListener('resize', () => {
+        updateCapsulePosition(buttons[currentActiveIndex], -1, currentActiveIndex);
+      });
+
+      // Immediate first frame layout pass
+      setTimeout(() => {
+        updateCapsulePosition(buttons[0], -1, 0);
+      }, 50);
+    })();
+  </script>
+</body>
+</html>

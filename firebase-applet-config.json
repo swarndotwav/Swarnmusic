@@ -1,11 +1,12 @@
 {
-  "projectId": "diesel-moon-9kdsq",
-  "appId": "1:258042746687:web:03433a5677ac9d35f1258a",
-  "apiKey": "AIzaSyBkUX4Dp8_5eBW9FqhOf5DkoAaoquPIo_g",
-  "authDomain": "diesel-moon-9kdsq.firebaseapp.com",
-  "storageBucket": "diesel-moon-9kdsq.firebasestorage.app",
-  "messagingSenderId": "258042746687",
+  "projectId": "gen-lang-client-0936881343",
+  "appId": "1:882062339752:web:3010629d7fcc979dc8dc9d",
+  "apiKey": "AIzaSyBBivxU0k8fS0nLzTFA9XHGRd0XRPAmijE",
+  "authDomain": "gen-lang-client-0936881343.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-swarnmusic-85d4a2d1-0a4e-40ad-9dd1-33bfb77661c0",
+  "storageBucket": "gen-lang-client-0936881343.firebasestorage.app",
+  "messagingSenderId": "882062339752",
   "measurementId": "",
-  "oAuthClientId": "258042746687-bn5egm23ull2demer519vlj33jp04ce1.apps.googleusercontent.com",
+  "oAuthClientId": "882062339752-02aki6cak84eguqtlmc42gnrfg6nittm.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

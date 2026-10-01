@@ -1,42 +1,48 @@
-import React, { useState, useEffect } from 'react';
-import { INITIAL_ARTISTS } from './data/mockArtists';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArtistProfile, WorkPiece, Conversation, ChatMessage, Review, ArtistRole } from './types';
 import { Navigation } from './components/Navigation';
-import { HeroSection } from './components/HeroSection';
+import { HeroSection, SWARN_INSTAGRAM_COMMUNITY_URL } from './components/HeroSection';
 import { DiscoverySection } from './components/DiscoverySection';
 import { PortfolioModal } from './components/PortfolioModal';
 import { UploadPieceModal } from './components/UploadPieceModal';
-import { AuthModal } from './components/AuthModal';
 import { ProfileEditModal } from './components/ProfileEditModal';
 import { ChatBox } from './components/ChatBox';
 import { HelpDeskModal } from './components/HelpDeskModal';
-import { GoogleDriveHubModal } from './components/GoogleDriveHubModal';
+import { RegistrationPage } from './components/RegistrationPage';
+import { LoginPage } from './components/LoginPage';
+import { ConnectUserModal } from './components/ConnectUserModal';
+import { InstagramDmBox } from './components/InstagramDmBox';
+import { SwarnUpiModal, FloatingSwarnButton } from './components/SwarnUpiModal';
 import { SwarnLogo } from './components/SwarnLogo';
-import { Sparkles, MessageSquare, Music, Shield, ArrowUpRight, Heart, Share2, Check } from 'lucide-react';
+import { ClickAnimationProvider } from './components/ClickAnimationProvider';
+import { CommunityExperiencesSection } from './components/CommunityExperiencesSection';
+import { FloatingPillNavigation, MainNavTab } from './components/FloatingPillNavigation';
+import { CurrentUserPortfolioCard } from './components/CurrentUserPortfolioCard';
+import { ArtistSearchMenuModal } from './components/ArtistSearchMenuModal';
+import { Sparkles, MessageSquare, Music, Shield, ArrowUpRight, Heart, Share2, Check, Instagram, Send } from 'lucide-react';
+import { api } from './services/api';
 
-const STORAGE_KEY_ARTISTS = 'swarn_artists_v4';
-const STORAGE_KEY_USER = 'swarn_current_user_v4';
-const STORAGE_KEY_CONVOS = 'swarn_conversations_v4';
+const STORAGE_KEY_USER = 'swarn_current_user_v5';
+
+type AppView = 'home' | 'register' | 'login';
 
 export default function App() {
-  // 1. Persistent Artists State (Merged with mock artists so new registered users appear immediately on Discover)
-  const [artists, setArtists] = useState<ArtistProfile[]>(() => {
+  // Page view routing (Home page and Registration page are cleanly separated)
+  const [currentView, setCurrentView] = useState<AppView>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_ARTISTS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge to guarantee all default mock artists remain plus all user additions
-          const ids = new Set(parsed.map((a: ArtistProfile) => a.id));
-          const missingMocks = INITIAL_ARTISTS.filter((mock) => !ids.has(mock.id));
-          return [...parsed, ...missingMocks];
-        }
-      }
+      const params = new URLSearchParams(window.location.search);
+      const page = params.get('page');
+      if (page === 'register') return 'register';
+      if (page === 'login') return 'login';
     } catch {}
-    return INITIAL_ARTISTS;
+    return 'home';
   });
 
-  // 2. Persistent Current User State
+  // 1. Registered Artists State (Shared from server backend)
+  const [artists, setArtists] = useState<ArtistProfile[]>([]);
+  const [isLoadingArtists, setIsLoadingArtists] = useState<boolean>(true);
+
+  // 2. Logged-in User State
   const [currentUser, setCurrentUser] = useState<ArtistProfile | null>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_USER);
@@ -45,74 +51,433 @@ export default function App() {
     return null;
   });
 
-  // 3. Persistent 1-on-1 Conversations State
-  const [conversations, setConversations] = useState<Record<string, Conversation>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_CONVOS);
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {
-      'artist-1': {
-        artistId: 'artist-1',
-        artistName: 'Aarav Sharma',
-        artistRole: 'singer',
-        artistAvatar:
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-        lastMessage: 'Hello! Welcome to swarnmusic. Would love to collaborate on acoustic melodies.',
-        lastTimestamp: 'Yesterday',
-        unreadCount: 1,
-        messages: [
-          {
-            id: 'init-msg-1',
-            senderId: 'artist-1',
-            senderName: 'Aarav Sharma',
-            receiverId: 'user-guest',
-            text: 'Hello! Welcome to swarnmusic. Feel free to browse through my vocal takes and message me anytime for projects.',
-            timestamp: 'Yesterday, 6:40 PM',
-          },
-        ],
-      },
-    };
-  });
+  // 3. User-to-User Conversations State
+  const [conversations, setConversations] = useState<Record<string, Conversation>>({});
 
   // Navigation and Filtering State
   const [activeNavTab, setActiveNavTab] = useState<string>('all');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('all');
 
-  // Modal Visibility States
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('signup');
+  // Modals & Active Targets
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isProfileEditModalOpen, setIsProfileEditModalOpen] = useState(false);
   const [selectedArtistForPortfolio, setSelectedArtistForPortfolio] = useState<ArtistProfile | null>(null);
   const [isChatBoxOpen, setIsChatBoxOpen] = useState(false);
+  const [isDmBoxOpen, setIsDmBoxOpen] = useState(false);
+  const [isSwarnUpiModalOpen, setIsSwarnUpiModalOpen] = useState(false);
   const [activeChatTarget, setActiveChatTarget] = useState<ArtistProfile | null>(null);
-  const [isGoogleDriveOpen, setIsGoogleDriveOpen] = useState(false);
+  const [connectTargetArtist, setConnectTargetArtist] = useState<ArtistProfile | null>(null);
+
+  // Floating Pill Navigation Dock Active Tab ('home' | 'search' | 'inbox' | 'profile')
+  const [activeDockTab, setActiveDockTab] = useState<MainNavTab>('home');
+  const [isSearchMenuOpen, setIsSearchMenuOpen] = useState(false);
+  const [isInboxChatActive, setIsInboxChatActive] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement || (document as any).webkitFullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        } else if ((document.documentElement as any).webkitRequestFullscreen) {
+          await (document.documentElement as any).webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn('Fullscreen request failed:', err);
+    }
+  };
+
+  // Real-time incoming message pop notification near inbox
+  const [incomingMessagePop, setIncomingMessagePop] = useState<{
+    senderId?: string;
+    senderName: string;
+    senderAvatar?: string;
+    text: string;
+    timestamp?: string;
+  } | null>(null);
+
+  const prevMessageIdsRef = useRef<Set<string>>(new Set());
+  const isInitialConnectionsLoadRef = useRef(true);
+  const popDismissTimerRef = useRef<any>(null);
+
+  // Pure Web Audio acoustic notification chime
+  const playIncomingChime = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      // D5 note (587.33Hz)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(587.33, now);
+      gain1.gain.setValueAtTime(0.2, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.35);
+
+      // A5 note (880Hz) harmonic bell
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880, now + 0.12);
+      gain2.gain.setValueAtTime(0.25, now + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.12);
+      osc2.stop(now + 0.65);
+    } catch {}
+  }, []);
+
+  const triggerIncomingPop = useCallback(
+    (msg: {
+      senderId?: string;
+      senderName: string;
+      senderAvatar?: string;
+      text: string;
+      timestamp?: string;
+    }) => {
+      setIncomingMessagePop(msg);
+      playIncomingChime();
+
+      if (popDismissTimerRef.current) clearTimeout(popDismissTimerRef.current);
+      popDismissTimerRef.current = setTimeout(() => {
+        setIncomingMessagePop(null);
+      }, 8000);
+    },
+    [playIncomingChime]
+  );
+
+  const handleOpenIncomingMessage = (senderId?: string) => {
+    setIncomingMessagePop(null);
+    if (senderId) {
+      const match = artists.find((a) => a.id === senderId);
+      if (match) {
+        setActiveChatTarget(match);
+      }
+    }
+    setIsDmBoxOpen(true);
+    setActiveDockTab('inbox');
+  };
+
+  const handleSelectDockTab = (tab: MainNavTab) => {
+    setActiveDockTab(tab);
+    if (tab === 'home') {
+      setIsDmBoxOpen(false);
+      setIsSearchMenuOpen(false);
+      setIsInboxChatActive(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (tab === 'search') {
+      setIsSearchMenuOpen((prev) => !prev);
+      setIsDmBoxOpen(false);
+      setIsInboxChatActive(false);
+    } else if (tab === 'inbox') {
+      setIsSearchMenuOpen(false);
+      setActiveChatTarget(null);
+      setIsInboxChatActive(false);
+      setIsDmBoxOpen(true);
+    } else if (tab === 'profile') {
+      setIsSearchMenuOpen(false);
+      setIsDmBoxOpen(false);
+      setIsInboxChatActive(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Helper to detect device system color scheme
+  const getSystemIsDark = (): boolean => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  };
+
+  // Theme mode: 'system' | 'dark' | 'light' (Default is 'system')
+  const [themeMode, setThemeMode] = useState<'system' | 'dark' | 'light'>(() => {
+    try {
+      const saved = localStorage.getItem('swarn_theme_mode');
+      if (saved === 'dark' || saved === 'light' || saved === 'system') {
+        return saved;
+      }
+    } catch {}
+    return 'system'; // Default to system!
+  });
+
+  // Dark mode state: default follows system preference
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('swarn_theme_mode');
+      if (saved === 'dark') return true;
+      if (saved === 'light') return false;
+    } catch {}
+    return getSystemIsDark();
+  });
+
+  // Real-time listener for OS system theme changes
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+      if (themeMode === 'system') {
+        setIsDarkMode(e.matches);
+      }
+    };
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleSystemThemeChange);
+      return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+    } else if ((mediaQuery as any).addListener) {
+      (mediaQuery as any).addListener(handleSystemThemeChange);
+      return () => (mediaQuery as any).removeListener(handleSystemThemeChange);
+    }
+  }, [themeMode]);
+
+  // Cycle theme: system -> dark -> light -> system
+  const toggleDarkMode = () => {
+    let nextMode: 'system' | 'dark' | 'light';
+    let nextIsDark: boolean;
+
+    if (themeMode === 'system') {
+      nextMode = isDarkMode ? 'light' : 'dark';
+      nextIsDark = !isDarkMode;
+    } else if (themeMode === 'dark') {
+      nextMode = 'light';
+      nextIsDark = false;
+    } else if (themeMode === 'light') {
+      nextMode = 'system';
+      nextIsDark = getSystemIsDark();
+    } else {
+      nextMode = 'system';
+      nextIsDark = getSystemIsDark();
+    }
+
+    setThemeMode(nextMode);
+    setIsDarkMode(nextIsDark);
+
+    try {
+      localStorage.setItem('swarn_theme_mode', nextMode);
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('chocolate-mode');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('chocolate-mode');
+    }
+  }, [isDarkMode]);
 
   // Link copy toast feedback
   const [copyFeedback, setCopyFeedback] = useState('');
 
-  // Handle external link sharing query param on load: ?portfolio=ARTIST_ID
-  useEffect(() => {
+  // Navigation router helper
+  const navigateTo = (view: AppView) => {
+    setCurrentView(view);
     try {
+      const url = new URL(window.location.href);
+      if (view === 'home') {
+        url.searchParams.delete('page');
+      } else {
+        url.searchParams.set('page', view);
+      }
+      window.history.pushState({}, '', url.toString());
+    } catch {}
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Listen to browser popstate (back/forward navigation)
+  useEffect(() => {
+    const handlePopState = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const page = params.get('page');
+        if (page === 'register') setCurrentView('register');
+        else if (page === 'login') setCurrentView('login');
+        else setCurrentView('home');
+      } catch {
+        setCurrentView('home');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Fetch real registered artists from the backend server and ensure all registered creators persist forever
+  const loadArtists = useCallback(async () => {
+    try {
+      const serverArtists = await api.getArtists();
+
+      // Read local persistent registry of all registered users
+      let localRegistry: ArtistProfile[] = [];
+      try {
+        const raw = localStorage.getItem('swarn_registered_artists_registry');
+        if (raw) localRegistry = JSON.parse(raw);
+      } catch {}
+
+      // Combine server artists and local registry deduplicated by ID
+      const combinedMap = new Map<string, ArtistProfile>();
+      for (const a of serverArtists) {
+        if (a && a.id) combinedMap.set(a.id, a);
+      }
+      for (const a of localRegistry) {
+        if (a && a.id && !combinedMap.has(a.id)) {
+          combinedMap.set(a.id, a);
+          // Sync missing registered artist to server so they are visible to all devices
+          api.registerArtist(a).catch(() => {});
+        }
+      }
+
+      if (currentUser && currentUser.id) {
+        if (!combinedMap.has(currentUser.id)) {
+          combinedMap.set(currentUser.id, currentUser);
+          api.registerArtist(currentUser).catch(() => {});
+        }
+      }
+
+      const allRegistered = Array.from(combinedMap.values());
+      try {
+        localStorage.setItem('swarn_registered_artists_registry', JSON.stringify(allRegistered));
+      } catch {}
+
+      setArtists(allRegistered);
+      setIsLoadingArtists(false);
+
+      // Check if external portfolio link parameter exists: ?portfolio=ARTIST_ID
       const params = new URLSearchParams(window.location.search);
       const portfolioId = params.get('portfolio');
       if (portfolioId) {
-        const found = artists.find((a) => a.id === portfolioId);
-        if (found) {
-          setSelectedArtistForPortfolio(found);
+        let match: ArtistProfile | null | undefined = allRegistered.find((a) => a.id === portfolioId);
+        if (!match) {
+          match = await api.getArtistById(portfolioId);
+        }
+        if (match) {
+          setSelectedArtistForPortfolio(match);
         }
       }
-    } catch {}
-  }, [artists]);
+    } catch (err) {
+      console.warn('Failed to load artists from server:', err);
+      setIsLoadingArtists(false);
+    }
+  }, [currentUser]);
 
-  // Sync state to localStorage
-  useEffect(() => {
+  // Fetch user connections and chat threads from server
+  const loadUserConnections = useCallback(async (userId?: string) => {
     try {
-      localStorage.setItem(STORAGE_KEY_ARTISTS, JSON.stringify(artists));
-    } catch {}
-  }, [artists]);
+      const effectiveId = userId || currentUser?.id;
+      const threads = await api.getConnections(effectiveId);
+      const convMap: Record<string, Conversation> = {};
 
+      const currentMsgIds = new Set<string>();
+      let latestIncoming: { senderId: string; senderName: string; senderAvatar?: string; text: string; timestamp?: string } | null = null;
+
+      for (const t of threads) {
+        const otherId = (t.participantIds || []).find((id: string) => id !== effectiveId);
+        if (!otherId) continue;
+        const otherInfo = t.participants?.[otherId] || {};
+
+        convMap[otherId] = {
+          artistId: otherId,
+          artistName: otherInfo.name || 'Fellow Artist',
+          artistRole: (otherInfo.role as ArtistRole) || 'singer',
+          artistAvatar: otherInfo.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+          lastMessage: t.lastMessage || 'Connected on swarnmusic',
+          lastTimestamp: t.lastTimestamp || 'Recently',
+          unreadCount: (t.unreadBy || []).includes(effectiveId || '') ? 1 : 0,
+          messages: (t.messages || []).map((m: any) => ({
+            id: m.id || `msg-${Math.random()}`,
+            senderId: m.senderId,
+            senderName: m.senderName,
+            receiverId: m.receiverId,
+            text: m.text,
+            timestamp: m.timestamp,
+            audioUrl: m.audioUrl,
+            audioDuration: m.audioDuration,
+            imageUrl: m.imageUrl,
+            imageCaption: m.imageCaption,
+          })),
+        };
+
+        for (const m of (t.messages || [])) {
+          currentMsgIds.add(m.id);
+
+          // Detect newly arrived incoming message
+          if (
+            !isInitialConnectionsLoadRef.current &&
+            !prevMessageIdsRef.current.has(m.id) &&
+            (!effectiveId || m.receiverId === effectiveId || (m.senderId !== effectiveId && (t.unreadBy || []).includes(effectiveId)))
+          ) {
+            latestIncoming = {
+              senderId: m.senderId,
+              senderName: m.senderName || otherInfo.name || 'Fellow Artist',
+              senderAvatar: otherInfo.avatar || m.senderAvatar,
+              text: m.text,
+              timestamp: m.timestamp,
+            };
+          }
+        }
+      }
+
+      setConversations(convMap);
+      prevMessageIdsRef.current = currentMsgIds;
+      isInitialConnectionsLoadRef.current = false;
+
+      // When a new message arrives from another user, pop notification near inbox
+      if (latestIncoming && !isDmBoxOpen) {
+        triggerIncomingPop(latestIncoming);
+      }
+    } catch (err) {
+      console.warn('Failed to load connections:', err);
+    }
+  }, [currentUser?.id, isDmBoxOpen, triggerIncomingPop]);
+
+  // Initial data load + automatic sync to server
+  useEffect(() => {
+    loadArtists();
+
+    // Auto-sync current user to server if they were in localStorage
+    if (currentUser) {
+      api.registerArtist(currentUser).then(() => {
+        loadArtists();
+      });
+      loadUserConnections(currentUser.id);
+    } else {
+      loadUserConnections();
+    }
+
+    // Regular responsive polling every 2.5s so new registered artists & incoming messages appear with zero delay
+    const pollInterval = setInterval(() => {
+      loadArtists();
+      loadUserConnections(currentUser?.id);
+    }, 2500);
+
+    return () => clearInterval(pollInterval);
+  }, [loadArtists, loadUserConnections, currentUser?.id]);
+
+  // Persist current user in local storage
   useEffect(() => {
     try {
       if (currentUser) {
@@ -123,65 +488,64 @@ export default function App() {
     } catch {}
   }, [currentUser]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_CONVOS, JSON.stringify(conversations));
-    } catch {}
-  }, [conversations]);
-
-  // Calculate unread chat messages
+  // Unread badge counter
   const totalUnreadCount = Object.values(conversations).reduce(
     (sum, c) => sum + (c.unreadCount || 0),
     0
   );
 
-  // Action Handlers
-  const handleOpenAuth = (mode: 'login' | 'signup' = 'signup') => {
-    setAuthModalMode(mode);
-    setIsAuthModalOpen(true);
+  const scrollToDiscovery = () => {
+    const el = document.getElementById('discovery-board');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
-  // Crucial requirement: "Any new user registers, show his portfolio on discover menu. New users are not showing in the app."
-  const handleAuthSuccess = (newUser: ArtistProfile) => {
+  // Successful Registration Handler (from separate RegistrationPage)
+  const handleRegisterSuccess = (newUser: ArtistProfile) => {
     setCurrentUser(newUser);
-
-    // Explicitly add newly registered user right to the TOP of the artists directory and save
-    setArtists((prev) => {
-      const filtered = prev.filter(
-        (a) => a.id !== newUser.id && a.email.toLowerCase() !== newUser.email.toLowerCase()
-      );
-      const updated = [newUser, ...filtered];
-      try {
-        localStorage.setItem(STORAGE_KEY_ARTISTS, JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-
-    // Automatically navigate to Discover so the user immediately sees their own portfolio card
+    // Add to top of artists state
+    setArtists((prev) => [newUser, ...prev.filter((a) => a.id !== newUser.id)]);
+    // Navigate to Home view
+    navigateTo('home');
     setSelectedRoleFilter('all');
     setActiveNavTab('all');
 
-    setCopyFeedback(`Welcome to swarnmusic, ${newUser.name}! Your portfolio is now live on the Discover board.`);
+    setCopyFeedback(`Welcome to swarnmusic, ${newUser.name}! Your public portfolio is now active.`);
     setTimeout(() => setCopyFeedback(''), 5000);
 
     setTimeout(() => {
       scrollToDiscovery();
-    }, 200);
+    }, 300);
+  };
+
+  // Successful Login Handler (from separate LoginPage)
+  const handleLoginSuccess = (user: ArtistProfile) => {
+    setCurrentUser(user);
+    navigateTo('home');
+    loadArtists();
+    loadUserConnections(user.id);
+
+    setCopyFeedback(`Signed in as ${user.name}`);
+    setTimeout(() => setCopyFeedback(''), 3000);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setConversations({});
+    setCopyFeedback('Signed out successfully');
+    setTimeout(() => setCopyFeedback(''), 2500);
   };
 
   const handleOpenUpload = () => {
     if (!currentUser) {
-      handleOpenAuth('signup');
+      navigateTo('register');
       return;
     }
     setIsUploadModalOpen(true);
   };
 
-  const handleSavePiece = (piece: WorkPiece) => {
+  const handleSavePiece = async (piece: WorkPiece) => {
     if (!currentUser) return;
 
     const updatedUser = {
@@ -190,64 +554,54 @@ export default function App() {
     };
     setCurrentUser(updatedUser);
 
-    // Update in artists directory and ensure persists at the top
-    setArtists((prev) => {
-      const updated = prev.map((artist) => {
-        if (artist.id === currentUser.id) {
-          return {
-            ...artist,
-            works: [piece, ...artist.works],
-          };
-        }
-        return artist;
-      });
-      try {
-        localStorage.setItem(STORAGE_KEY_ARTISTS, JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
+    setArtists((prev) =>
+      prev.map((artist) => (artist.id === currentUser.id ? updatedUser : artist))
+    );
+
+    // Save to server
+    await api.addWorkPiece(currentUser.id, piece);
 
     if (selectedArtistForPortfolio?.id === currentUser.id) {
       setSelectedArtistForPortfolio(updatedUser);
     }
   };
 
-  const handleSaveProfile = (updatedProfile: ArtistProfile) => {
+  const handleSaveProfile = async (updatedProfile: ArtistProfile) => {
     setCurrentUser(updatedProfile);
-    setArtists((prev) => {
-      const updated = prev.map((a) => (a.id === updatedProfile.id ? updatedProfile : a));
-      try {
-        localStorage.setItem(STORAGE_KEY_ARTISTS, JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
+    setArtists((prev) =>
+      prev.map((a) => (a.id === updatedProfile.id ? updatedProfile : a))
+    );
+    // Save to server
+    await api.updateProfile(updatedProfile.id, updatedProfile);
+
     if (selectedArtistForPortfolio?.id === updatedProfile.id) {
       setSelectedArtistForPortfolio(updatedProfile);
     }
   };
 
-  // Rating and review submission
-  const handleAddReview = (
+  // Submit review to piece
+  const handleAddReview = async (
     artistId: string,
     pieceId: string,
     rating: number,
     comment: string
   ) => {
-    const reviewerName = currentUser?.name || 'Acoustic Collaborator';
-    const reviewerRole = currentUser?.role || 'singer';
+    const reviewerName = currentUser?.name || 'Fellow Creator';
+    const reviewerRole: ArtistRole = currentUser?.role || 'singer';
 
     const newRev: Review = {
       id: `rev-${Date.now()}`,
       pieceId,
       authorName: reviewerName,
       authorRole: reviewerRole,
+      authorAvatar: currentUser?.avatar,
       rating,
       comment,
       createdAt: 'Just now',
     };
 
     setArtists((prevArtists) => {
-      const updatedList = prevArtists.map((art) => {
+      return prevArtists.map((art) => {
         if (art.id !== artistId) return art;
 
         const updatedWorks = art.works.map((w) => {
@@ -282,179 +636,168 @@ export default function App() {
 
         return updatedArtist;
       });
+    });
 
-      try {
-        localStorage.setItem(STORAGE_KEY_ARTISTS, JSON.stringify(updatedList));
-      } catch {}
-      return updatedList;
+    // Save review to server
+    await api.addReview(artistId, {
+      pieceId,
+      rating,
+      comment,
+      authorName: reviewerName,
+      authorRole: reviewerRole,
+      authorAvatar: currentUser?.avatar,
     });
   };
 
-  // Approach / Invite Flow
-  const handleOpenInvite = (artist: ArtistProfile) => {
-    if (!currentUser) {
-      handleOpenAuth('signup');
-      return;
-    }
+  // Open 1-to-1 conversation directly in Instagram DM Box with connecting artist
+  const handleOpenConnect = (artist: ArtistProfile) => {
     setActiveChatTarget(artist);
-    setIsChatBoxOpen(true);
+    setIsDmBoxOpen(true);
   };
 
-  // Direct share portfolio via external link: ?portfolio=ARTIST_ID
-  const handleSharePortfolioLink = (artist: ArtistProfile) => {
-    const baseUrl = window.location.origin + window.location.pathname;
-    const shareableUrl = `${baseUrl}?portfolio=${artist.id}`;
-    navigator.clipboard.writeText(shareableUrl);
-    setCopyFeedback(`Copied shareable link for ${artist.name}'s portfolio!`);
-    setTimeout(() => setCopyFeedback(''), 3500);
-  };
-
-  // 1-on-1 Chat Messaging with simulated artist replies
-  const handleSendMessage = (
-    artistId: string,
+  // Handle direct 1-on-1 message sending between users
+  const handleSendMessage = async (
+    targetArtistId: string,
     text: string,
     isInvite?: boolean,
     inviteData?: any
   ) => {
-    const sender = currentUser || {
-      id: 'guest-session',
-      name: 'Independent Musician',
-      role: 'composer' as ArtistRole,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    };
+    if (!currentUser) {
+      navigateTo('register');
+      return;
+    }
 
-    const target = artists.find((a) => a.id === artistId);
-    if (!target) return;
+    const timestamp =
+      new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) +
+      ', ' +
+      new Date().toLocaleDateString([], { month: 'short', day: 'numeric' });
 
     const newMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
-      senderId: sender.id,
-      senderName: sender.name,
-      receiverId: artistId,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      receiverId: targetArtistId,
       text,
-      timestamp: 'Just now',
+      timestamp,
       isInvite,
       inviteDetails: inviteData,
     };
 
     setConversations((prev) => {
-      const existing = prev[artistId] || {
-        artistId: target.id,
-        artistName: target.name,
-        artistRole: target.role,
-        artistAvatar: target.avatar,
-        lastMessage: text,
-        lastTimestamp: 'Just now',
-        unreadCount: 0,
-        messages: [],
-      };
+      const existing = prev[targetArtistId];
+      const targetArtistObj = artists.find((a) => a.id === targetArtistId) || activeChatTarget;
 
       return {
         ...prev,
-        [artistId]: {
-          ...existing,
+        [targetArtistId]: {
+          artistId: targetArtistId,
+          artistName: targetArtistObj?.name || existing?.artistName || 'Artist',
+          artistRole: targetArtistObj?.role || existing?.artistRole || 'singer',
+          artistAvatar:
+            targetArtistObj?.avatar ||
+            existing?.artistAvatar ||
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
           lastMessage: text,
           lastTimestamp: 'Just now',
           unreadCount: 0,
-          messages: [...existing.messages, newMsg],
+          messages: existing ? [...existing.messages, newMsg] : [newMsg],
         },
       };
     });
 
-    // Simulate response from artist in pure English
-    setTimeout(() => {
-      let replyText = '';
-      if (target.role === 'singer') {
-        replyText = `Hello ${sender.name}! Thank you for reaching out. I would be thrilled to lay down vocal tracks or alaap for this piece. What key and tempo do you envision?`;
-      } else if (target.role === 'lyricist') {
-        replyText = `Hello ${sender.name}! I received your message. I love the concept and have some thoughts on the meter and emotional imagery. Let's discuss the verse structure!`;
-      } else if (target.role === 'composer') {
-        replyText = `Hello! Wonderful to connect on swarnmusic. Your musical direction resonates with me. Let me assemble a quick acoustic progression in my studio and share back with you.`;
-      } else {
-        replyText = `Hello! Glad to connect. I am available for this musical venture. Let's create something soulful together.`;
-      }
-
-      const replyMsg: ChatMessage = {
-        id: `reply-${Date.now()}`,
-        senderId: target.id,
-        senderName: target.name,
-        receiverId: sender.id,
-        text: replyText,
-        timestamp: 'Just now',
-      };
-
-      setConversations((prev) => {
-        const convo = prev[artistId];
-        if (!convo) return prev;
-        return {
-          ...prev,
-          [artistId]: {
-            ...convo,
-            lastMessage: replyText,
-            lastTimestamp: 'Just now',
-            messages: [...convo.messages, replyMsg],
-          },
-        };
-      });
-    }, 1200);
+    // Send to server so target artist receives it on their account
+    const targetArtistObj = artists.find((a) => a.id === targetArtistId);
+    await api.sendConnection({
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      senderAvatar: currentUser.avatar,
+      senderRole: currentUser.role,
+      receiverId: targetArtistId,
+      receiverName: targetArtistObj?.name || 'Artist',
+      receiverAvatar: targetArtistObj?.avatar,
+      receiverRole: targetArtistObj?.role || 'musician',
+      projectType: inviteData?.projectTitle,
+      messageText: text,
+    });
   };
 
   const handleSelectConversation = (artistId: string) => {
     const artist = artists.find((a) => a.id === artistId);
     if (artist) {
       setActiveChatTarget(artist);
-      setConversations((prev) => {
-        if (!prev[artistId]) return prev;
-        return {
-          ...prev,
-          [artistId]: {
-            ...prev[artistId],
-            unreadCount: 0,
-          },
-        };
-      });
     }
+    setConversations((prev) => {
+      if (!prev[artistId]) return prev;
+      return {
+        ...prev,
+        [artistId]: {
+          ...prev[artistId],
+          unreadCount: 0,
+        },
+      };
+    });
   };
 
-  const scrollToDiscovery = () => {
-    const el = document.getElementById('discovery-section');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
+  // External link share copying helper
+  const handleSharePortfolioLink = (artist: ArtistProfile) => {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const shareUrl = `${baseUrl}?portfolio=${artist.id}`;
+    navigator.clipboard.writeText(shareUrl);
+    setCopyFeedback(`Link for ${artist.name}'s portfolio copied to clipboard!`);
+    setTimeout(() => setCopyFeedback(''), 3000);
   };
 
+  // VIEW 1: DEDICATED SEPARATE REGISTRATION PAGE
+  if (currentView === 'register') {
+    return (
+      <RegistrationPage
+        onSuccess={handleRegisterSuccess}
+        onNavigateHome={() => navigateTo('home')}
+        onNavigateLogin={() => navigateTo('login')}
+      />
+    );
+  }
+
+  // VIEW 2: DEDICATED SEPARATE LOGIN PAGE
+  if (currentView === 'login') {
+    return (
+      <LoginPage
+        onSuccess={handleLoginSuccess}
+        onNavigateHome={() => navigateTo('home')}
+        onNavigateRegister={() => navigateTo('register')}
+      />
+    );
+  }
+
+  // VIEW 3: HOME PAGE
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-[#1C1917] paper-texture flex flex-col font-sans selection:bg-[#7A131B] selection:text-white relative">
-      {/* Toast Notification for Link Copying */}
+    <div
+      className={`min-h-screen flex flex-col font-sans selection:bg-[#7A131B] selection:text-white transition-colors duration-300 ${
+        isDarkMode ? 'bg-[#2D1A12] text-[#FAF5EE]' : 'bg-white text-stone-900'
+      }`}
+    >
+      {/* Toast Feedback Banner */}
       {copyFeedback && (
-        <div className="fixed top-20 right-6 z-50 bg-[#7A131B] text-white px-4 py-2.5 rounded-lg shadow-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-          <Check size={14} className="text-emerald-300" />
+        <div className="fixed top-20 right-6 z-50 bg-[#7A131B] text-white px-4 py-2.5 rounded-lg shadow-xl text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-top-3 duration-200">
+          <Check size={14} className="text-amber-300" />
           <span>{copyFeedback}</span>
         </div>
       )}
 
-      {/* 1. TOP NAVIGATION BAR */}
+      {/* 1. TOP STICKY NAVIGATION */}
       <Navigation
         currentUser={currentUser}
-        onOpenAuth={handleOpenAuth}
+        onOpenAuth={(mode) => navigateTo(mode === 'login' ? 'login' : 'register')}
         onOpenUpload={handleOpenUpload}
         onOpenProfile={() => {
           if (currentUser) {
             setSelectedArtistForPortfolio(currentUser);
           } else {
-            handleOpenAuth('signup');
+            navigateTo('register');
           }
         }}
         onOpenChatList={() => {
-          if (!currentUser) {
-            handleOpenAuth('signup');
-            return;
-          }
-          const firstConvoKey = Object.keys(conversations)[0];
-          if (firstConvoKey) {
-            handleSelectConversation(firstConvoKey);
-          }
-          setIsChatBoxOpen(true);
+          setIsDmBoxOpen(true);
         }}
         onFilterRole={(role) => {
           setSelectedRoleFilter(role);
@@ -464,71 +807,121 @@ export default function App() {
         onLogout={handleLogout}
         activeNavTab={activeNavTab}
         setActiveNavTab={setActiveNavTab}
-        onOpenGoogleDrive={() => setIsGoogleDriveOpen(true)}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={toggleDarkMode}
+        themeMode={themeMode}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        incomingPop={incomingMessagePop}
       />
 
-      {/* 2. SPLIT HERO SECTION WITH ANIMATED SLIDES */}
+      {/* 2. SPLIT HERO SECTION WITH REAL REGISTERED ARTISTS */}
       <main className="flex-1">
-        <HeroSection
-          artists={artists}
-          onSelectArtist={(artist) => setSelectedArtistForPortfolio(artist)}
-          onOpenInvite={handleOpenInvite}
-          onOpenAuth={handleOpenAuth}
-          onExploreClick={scrollToDiscovery}
-        />
-
-        {/* 3. ARTISANAL MANIFESTO & THEMATIC EMBLEM BANNER */}
-        <section className="py-12 border-b border-[#E5D9C8] bg-[#F5EFE6]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
-              {/* Emblem Stamp */}
-              <div className="shrink-0">
-                <SwarnLogo size="lg" withPaperSeal={true} showSubtext={true} />
-              </div>
-
-              {/* Editorial Statement in pure English */}
-              <div className="space-y-2 text-center lg:text-left max-w-2xl">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#7A131B]">
-                  Our Philosophy · Melody, Rhythm & Verses
-                </span>
-                <h3 className="text-2xl font-display font-bold text-stone-900 leading-snug">
-                  "Every pure musical note deserves its poet, and every lyric seeks its melody."
-                </h3>
-                <p className="text-sm text-stone-700 leading-relaxed">
-                  swarnmusic connects the sacred triangle of sound: the vocalist's breath,
-                  the composer's harmonic architecture, and the songwriter's words. No algorithmic
-                  distractions — only verified artists, authentic work pieces, and direct 1-on-1 collaboration rooms.
+        {activeDockTab === 'profile' ? (
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+            <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#E5D9C8] dark:border-white/10">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-display font-bold text-stone-900 dark:text-white">
+                  User Profile & Portfolio
+                </h2>
+                <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-300">
+                  Personal details, verified category credentials, uploaded musical takes, and artistic influences.
                 </p>
               </div>
-
-              {/* Quick Action */}
-              <div className="shrink-0 flex flex-col items-center sm:items-start gap-2">
-                <button
-                  onClick={() => handleOpenAuth('signup')}
-                  className="px-5 py-2.5 text-xs font-semibold text-white bg-[#7A131B] hover:bg-[#8C1620] rounded-md transition-colors shadow-sm cursor-pointer"
-                >
-                  Join the Community
-                </button>
-                <span className="text-[11px] text-stone-700">Free public portfolio hosting for all creators</span>
-              </div>
+              <button
+                onClick={() => handleSelectDockTab('home')}
+                className="px-4 py-2 text-xs font-semibold rounded-full bg-stone-200 dark:bg-white/10 text-stone-800 dark:text-stone-100 hover:bg-stone-300 transition-colors cursor-pointer"
+              >
+                ← Back to Home
+              </button>
             </div>
+            <CurrentUserPortfolioCard
+              currentUser={currentUser}
+              onOpenUpload={handleOpenUpload}
+              onOpenEditProfile={() => setIsProfileEditModalOpen(true)}
+              onRequireAuth={(mode) => navigateTo(mode === 'login' ? 'login' : 'register')}
+              onLogout={handleLogout}
+              onSelectArtist={(artist) => setSelectedArtistForPortfolio(artist)}
+              isDarkMode={isDarkMode}
+            />
           </div>
-        </section>
+        ) : (
+          <>
+            <HeroSection
+              artists={artists}
+              onSelectArtist={(artist) => setSelectedArtistForPortfolio(artist)}
+              onOpenInvite={handleOpenConnect}
+              onOpenAuth={(mode) => navigateTo(mode === 'login' ? 'login' : 'register')}
+              onExploreClick={scrollToDiscovery}
+            />
 
-        {/* 4. DISCOVERY BOARD & SEARCH FEATURE */}
-        <DiscoverySection
-          artists={artists}
-          onSelectArtist={(artist) => setSelectedArtistForPortfolio(artist)}
-          onOpenInvite={handleOpenInvite}
-          selectedRoleFilter={selectedRoleFilter}
-          onFilterRoleChange={(role) => setSelectedRoleFilter(role)}
-          onShareArtist={handleSharePortfolioLink}
-          currentUserId={currentUser?.id}
-          onOpenUpload={handleOpenUpload}
-        />
+            {/* 3. ARTISANAL MANIFESTO & THEMATIC EMBLEM BANNER */}
+            <section className="py-12 border-b border-[#E5D9C8] bg-[#F5EFE6]">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+                  {/* Emblem Stamp */}
+                  <div className="shrink-0">
+                    <SwarnLogo size="lg" withPaperSeal={true} showSubtext={true} />
+                  </div>
+
+                  {/* Editorial Statement */}
+                  <div className="space-y-2 text-center lg:text-left max-w-2xl">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[#7A131B]">
+                      Our Philosophy · Melody, Rhythm & Verses
+                    </span>
+                    <h3 className="text-2xl font-display font-bold text-stone-900 leading-snug">
+                      "Every pure musical note deserves its poet, and every lyric seeks its melody."
+                    </h3>
+                    <p className="text-sm text-stone-700 leading-relaxed">
+                      swarnmusic connects the sacred triangle of sound: the vocalist's breath,
+                      the composer's harmonic architecture, and the songwriter's words. Zero fake AI profiles —
+                      only authentic artists, published public portfolios, and direct creator connections.
+                    </p>
+                  </div>
+
+                  {/* Quick Action: Join Community on Instagram */}
+                  <div className="shrink-0 flex flex-col items-center sm:items-start gap-2">
+                    <a
+                      href={SWARN_INSTAGRAM_COMMUNITY_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-5 py-2.5 text-xs font-semibold text-white bg-[#7A131B] hover:bg-[#8C1620] rounded-md transition-colors shadow-sm cursor-pointer flex items-center gap-2"
+                    >
+                      <Instagram size={14} />
+                      <span>Join the Community</span>
+                    </a>
+                    <span className="text-[11px] text-stone-600">Follow our Instagram community updates</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* 4. DISCOVERY BOARD & SEARCH FEATURE */}
+            <div id="discovery-board">
+              <DiscoverySection
+                artists={artists}
+                onSelectArtist={(artist) => setSelectedArtistForPortfolio(artist)}
+                onOpenInvite={handleOpenConnect}
+                selectedRoleFilter={selectedRoleFilter}
+                onFilterRoleChange={(role) => setSelectedRoleFilter(role)}
+                onShareArtist={handleSharePortfolioLink}
+                currentUserId={currentUser?.id}
+                onOpenUpload={handleOpenUpload}
+                onOpenRegister={() => navigateTo('register')}
+              />
+            </div>
+
+            {/* 5. AT THE BOTTOM OF THE WEBSITE: COMMUNITY EXPERIENCES & COMMENTS SECTION */}
+            <CommunityExperiencesSection
+              currentUser={currentUser}
+              onRequireAuth={(mode) => navigateTo(mode === 'login' ? 'login' : 'register')}
+              isDarkMode={isDarkMode}
+            />
+          </>
+        )}
       </main>
 
-      {/* 5. FOOTER */}
+      {/* 6. FOOTER */}
       <footer className="border-t border-[#E5D9C8] bg-[#F5EFE6] py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-stone-700">
           <div className="flex items-center gap-3">
@@ -564,56 +957,178 @@ export default function App() {
             >
               Lyricists
             </button>
-            <button onClick={() => handleOpenAuth('signup')} className="hover:text-[#7A131B] font-semibold cursor-pointer">
+            <button
+              onClick={() => {
+                const el = document.getElementById('community-experiences');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="hover:text-stone-900 cursor-pointer"
+            >
+              Experiences
+            </button>
+            <a
+              href={SWARN_INSTAGRAM_COMMUNITY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#7A131B] font-semibold hover:underline"
+            >
+              Join the Community
+            </a>
+            <button
+              onClick={() => navigateTo('register')}
+              className="hover:text-[#7A131B] font-semibold cursor-pointer"
+            >
               Create Portfolio
             </button>
           </div>
 
-          <div className="text-[11px] text-stone-700">
-            © {new Date().getFullYear()} swarnmusic. All rights reserved to respective creators.
+          <div className="text-[11px] text-stone-600">
+            © {new Date().getFullYear()} swarnmusic. Real music creators only.
           </div>
         </div>
       </footer>
 
-      {/* FLOATING HELP DESK: Connects user directly to creator (Sundram) through a live chat box */}
-      <HelpDeskModal userEmail={currentUser?.email} userName={currentUser?.name} />
+      {/* FLOATING HELP DESK: Small Button, AI Bot Named SHUREN, With Option to Redirect to Person in Inbox */}
+      <HelpDeskModal
+        userEmail={currentUser?.email}
+        userName={currentUser?.name}
+        onRedirectToPerson={() => {
+          // Connect user to "me" (creator/admin with email sundram230810@gmail.com or named DoDo / Sundram)
+          let targetPerson = artists.find(
+            (a) =>
+              a.email === 'sundram230810@gmail.com' ||
+              a.name?.toLowerCase().includes('dodo') ||
+              a.name?.toLowerCase().includes('sundram') ||
+              a.id === 'artist-1790766038879'
+          );
+          if (!targetPerson || targetPerson.id === currentUser?.id) {
+            targetPerson = artists.find((a) => a.id !== currentUser?.id) || targetPerson;
+          }
+
+          if (targetPerson) {
+            setActiveChatTarget(targetPerson);
+          }
+          setActiveDockTab('inbox');
+          setIsDmBoxOpen(true);
+        }}
+      />
 
       {/* MODALS */}
-      {/* 1. Artist Public Portfolio Modal with Animated Slides & Extended Credentials */}
+      {/* 1. Artist Public Portfolio Modal with Share & Reviews */}
       {selectedArtistForPortfolio && (
         <PortfolioModal
           artist={selectedArtistForPortfolio}
           isOpen={!!selectedArtistForPortfolio}
           onClose={() => setSelectedArtistForPortfolio(null)}
-          onOpenInvite={handleOpenInvite}
+          onOpenInvite={handleOpenConnect}
           onAddReview={handleAddReview}
           isCurrentUser={currentUser?.id === selectedArtistForPortfolio.id}
           onOpenUpload={handleOpenUpload}
           onOpenEditProfile={() => setIsProfileEditModalOpen(true)}
+          isDarkMode={isDarkMode}
         />
       )}
 
-      {/* 2. Upload Piece of Work Modal */}
+      {/* 2. Direct Artist-to-Artist Connection Modal (Must connect one user to another user) */}
+      <ConnectUserModal
+        isOpen={!!connectTargetArtist}
+        onClose={() => setConnectTargetArtist(null)}
+        targetArtist={connectTargetArtist}
+        currentUser={currentUser}
+        onRequireAuth={(mode) => {
+          setConnectTargetArtist(null);
+          navigateTo(mode === 'login' ? 'login' : 'register');
+        }}
+        onOpenChatWithArtist={(target) => {
+          setConnectTargetArtist(null);
+          setActiveChatTarget(target);
+          setIsDmBoxOpen(true);
+        }}
+      />
+
+      {/* 3. Community Direct Messages (APPROACH Box - 1-to-1 Chat) */}
+      <InstagramDmBox
+        isOpen={isDmBoxOpen}
+        onClose={() => {
+          setIsDmBoxOpen(false);
+          setIsInboxChatActive(false);
+          if (activeDockTab === 'inbox') {
+            setActiveDockTab('home');
+          }
+        }}
+        currentUser={currentUser}
+        artists={artists}
+        onOpenPortfolio={(artist) => {
+          setIsDmBoxOpen(false);
+          setIsInboxChatActive(false);
+          setSelectedArtistForPortfolio(artist);
+        }}
+        onRequireAuth={(mode) => {
+          setIsDmBoxOpen(false);
+          setIsInboxChatActive(false);
+          navigateTo(mode === 'login' ? 'login' : 'register');
+        }}
+        initialTargetArtist={activeChatTarget}
+        isDarkMode={isDarkMode}
+        onActiveChatChange={(isActive) => {
+          setIsInboxChatActive(isActive);
+        }}
+      />
+
+      {/* 60FPS LOCKED CLICK ANIMATION PROVIDER ON EVERY SINGLE CLICK */}
+      <ClickAnimationProvider />
+
+      {/* Floating Pill Search Menu Modal (Search artists by stage name, real name, role) */}
+      <ArtistSearchMenuModal
+        isOpen={isSearchMenuOpen}
+        onClose={() => {
+          setIsSearchMenuOpen(false);
+          if (activeDockTab === 'search') setActiveDockTab('home');
+        }}
+        artists={artists}
+        onSelectArtist={(artist) => {
+          setSelectedArtistForPortfolio(artist);
+        }}
+        onOpenMessage={(artist) => {
+          setActiveChatTarget(artist);
+          setIsDmBoxOpen(true);
+        }}
+        currentUserId={currentUser?.id}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* FLOATING LIQUID GLASS PILL NAVIGATION DOCK (Home, Search, Inbox, Profile) - Stays visible during search */}
+      <FloatingPillNavigation
+        activeTab={isSearchMenuOpen ? 'search' : activeDockTab}
+        onSelectTab={handleSelectDockTab}
+        currentUser={currentUser}
+        unreadCount={totalUnreadCount}
+        isVisible={!isInboxChatActive}
+        incomingPop={incomingMessagePop}
+        onOpenIncomingPop={handleOpenIncomingMessage}
+        onDismissIncomingPop={() => setIncomingMessagePop(null)}
+      />
+
+      {/* Floating Small Icon Named "Swarn" with UPI Support (9708298001@fam) */}
+      <FloatingSwarnButton onClick={() => setIsSwarnUpiModalOpen(true)} />
+
+      {/* Swarn UPI Payment & QR Modal */}
+      <SwarnUpiModal
+        isOpen={isSwarnUpiModalOpen}
+        onClose={() => setIsSwarnUpiModalOpen(false)}
+      />
+
+      {/* 4. Upload Piece of Work Modal */}
       {currentUser && (
         <UploadPieceModal
           isOpen={isUploadModalOpen}
           onClose={() => setIsUploadModalOpen(false)}
           currentUser={currentUser}
           onSavePiece={handleSavePiece}
-          onOpenGoogleDrive={() => setIsGoogleDriveOpen(true)}
         />
       )}
 
-      {/* 3. Auth Modal (Password Based, No OTP) */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onSuccess={handleAuthSuccess}
-        initialMode={authModalMode}
-        existingArtists={artists}
-      />
-
-      {/* 4. Profile Customization & Expanded Portfolio Modal */}
+      {/* 4. Profile Customization Modal */}
       {currentUser && (
         <ProfileEditModal
           isOpen={isProfileEditModalOpen}
@@ -623,7 +1138,7 @@ export default function App() {
         />
       )}
 
-      {/* 5. 1-on-1 Chat Box Between Artists */}
+      {/* 5. 1-on-1 Messages & Chat Thread between Artists */}
       {currentUser && (
         <ChatBox
           isOpen={isChatBoxOpen}
@@ -635,18 +1150,6 @@ export default function App() {
           onSelectConversation={handleSelectConversation}
         />
       )}
-
-      {/* 6. Google Drive Studio Hub Modal */}
-      <GoogleDriveHubModal
-        isOpen={isGoogleDriveOpen}
-        onClose={() => setIsGoogleDriveOpen(false)}
-        currentUser={currentUser}
-        onImportPieceToPortfolio={(piece) => {
-          handleSavePiece(piece);
-          setCopyFeedback(`Imported "${piece.title}" from Google Drive into your portfolio!`);
-          setTimeout(() => setCopyFeedback(''), 4500);
-        }}
-      />
     </div>
   );
 }
